@@ -20,7 +20,7 @@ __kernel void sum_by_reduction(__global float* in, __global float* out, uint32_t
     scratch[global_idx] = in[global_idx];
 
     // Synchronize threads within the work-group to ensure all local data is available
-    barrier(CLK_GLOBAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     // Perform a reduction operation on the local data
     for (size_t stride = get_global_size(0) / 2; stride > 0; stride /= 2) {
@@ -29,7 +29,7 @@ __kernel void sum_by_reduction(__global float* in, __global float* out, uint32_t
         }
 
         // Synchronize threads within the work-group to ensure all partial sums are computed
-        barrier(CLK_GLOBAL_MEM_FENCE);
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
 
     // Write the result of the reduction to the output buffer
