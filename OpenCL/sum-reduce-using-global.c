@@ -3,6 +3,9 @@
 __kernel void sum_by_reduction(__global float* in, __global float* out, uint32_t len) {
 
     __local float scratch[SCRATCH_SIZE];
+	# artificial assumption ; this is how it is done with CUDA constricting on working with exactly
+	# one block, i.e in terms of openCL one work-group of the same size of the global_size.
+	assert(get_local_size() == get_global_size() == SCRATCH_SIZE);
 
     size_t global_idx = get_global_id(0);
 
