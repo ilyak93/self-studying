@@ -3,9 +3,14 @@
 __kernel void sum_by_reduction(__global float* in, __global float* out, uint32_t len) {
 
     __local float scratch[SCRATCH_SIZE];
-	# artificial assumption ; this is how it is done with CUDA constricting on working with exactly
-	# one block, i.e in terms of openCL one work-group of the same size of the global_size.
+	
 	assert(get_local_size() == get_global_size() == SCRATCH_SIZE);
+	
+	# Not in every case this is the best option, but in this case it is optimal, as
+	# reduction need to perofrm many read and write access, which is faster on local memory,
+	# and we need as the output only one value (total sum), which can be written in the end to
+	# the global out memory, thus accessing it only ones in the end (and once for reading in the
+	# beginning).
 
     size_t global_idx = get_global_id(0);
 
