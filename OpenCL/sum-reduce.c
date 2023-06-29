@@ -169,3 +169,6 @@ __kernel void sum_by_reduction_gen(__global float* in, __global float* out, uint
 // i.e reduced to one result. In the above case we will have a vector result of size: global size / local size.
 // Although in many case this is not the usual flow of GPU processing and the casual use-case is
 // when the tasks are data-separbale and each data-bulk can be independtly processed. 
+
+// But if we face a such situation, there are another approaches like producer-consumer to process 
+// more data then a global memory can fit in once.
