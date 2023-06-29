@@ -166,6 +166,6 @@ __kernel void sum_by_reduction_many_sums(__global float* in, __global float* out
 // more then one read and write from global memory is inevitable because in that case
 // one use of local memory isn't enough and the global memory always will serve as a bridge,
 // to aggregate the local results and then continue again work on them, untill all are processed,
-// i.e reduced to one result.
+// i.e reduced to one result. In the above case we will have a vector result of size: global size / local size.
 // Although in many case this is not the usual flow of GPU processing and the casual use-case is
 // when the tasks are data-separbale and each data-bulk can be independtly processed. 
