@@ -119,7 +119,7 @@ __kernel void sum_by_reduction_many(__global float* in, __global float* out, uin
 #define SCRATCH_SIZE 1024
 
 // a generalization of previous both, works for both cases without pre-assumptions
-__kernel void sum_by_reduction_many_sums(__global float* in, __global float* out, uint32_t len) {
+__kernel void sum_by_reduction_gen(__global float* in, __global float* out, uint32_t len) {
 
     __local float scratch[SCRATCH_SIZE];
 
