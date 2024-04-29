@@ -1,40 +1,24 @@
-//
-// Created by YOSSI on 4/22/2024.
-//
-
 #ifndef QUEUE_H
 #define QUEUE_H
 
-#include <stdio.h>
-#include <stdlib.h>
+typedef void* Element;
+typedef Element (*CopyFunction)(const void*);
+typedef void (*FreeFunction)(void*);
 
+typedef struct queue_t* Queue;  // Opaque structure declaration
+
+// Result type enumeration
 typedef enum {
     QUEUE_OK,
     QUEUE_ERROR_ALLOC,
     QUEUE_ERROR_EMPTY
 } QueueResult;
 
-typedef void* Element;
+// Function declarations
+Queue createQueue(CopyFunction copy, FreeFunction free);
+QueueResult enqueue(Queue queue, Element element);
+QueueResult dequeue(Queue queue, Element *element);
+void clearQueue(Queue queue);
+void freeQueue(Queue queue);
 
-typedef void* (*CopyFunction)(const void*);
-typedef void (*FreeFunction)(void*);
-
-typedef struct node {
-    Element data;
-    struct node *next;
-} Node;
-
-typedef struct {
-    Node *front;
-    Node *rear;
-    CopyFunction copyFunc;
-    FreeFunction freeFunc;
-} Queue;
-
-void* createQueue(CopyFunction copyFunc, FreeFunction freeFunc);
-QueueResult enqueue(Queue*, Element);
-QueueResult dequeue(Queue*, Element*);
-void clearQueue(Queue* );
-
-
-#endif //QUEUE_H
+#endif

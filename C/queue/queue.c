@@ -1,64 +1,73 @@
-#include "queue.h"
+#include "Queue.h"
+#include <stdlib.h>
 
-void* createQueue(CopyFunction copyFunc, FreeFunction freeFunc) {
-    Queue *q = malloc(sizeof(Queue));
-    if (q == NULL) {
+typedef struct node {
+    Element data;
+    struct node *next;
+} Node;
+
+struct queue_t {
+    Node *front;
+    Node *rear;
+    CopyFunction copy;
+    FreeFunction free;
+} queue_t;
+
+Queue createQueue(CopyFunction copyFunc, FreeFunction freeFunc) {
+    Queue queue = (Queue)malloc(sizeof(*queue));
+    if (!queue) {
         return NULL;
     }
-    q->front = q->rear = NULL;
-    q->copyFunc = copyFunc;
-    q->freeFunc = freeFunc;
-    return q;
+    queue->front = queue->rear = NULL;
+    queue->copy = copyFunc;
+    queue->free = freeFunc;
+    return queue;
 }
 
-QueueResult enqueue(Queue *q, Element value) {
-    if (!q) return QUEUE_ERROR_ALLOC;
-
+QueueResult enqueue(Queue queue, Element element) {
+    if (!queue) return QUEUE_ERROR_ALLOC;
     Node *newNode = malloc(sizeof(Node));
-    if (!newNode) {
-        return QUEUE_ERROR_ALLOC;
-    }
+    if (!newNode) return QUEUE_ERROR_ALLOC;
 
-    newNode->data = q->copyFunc(value);
+    newNode->data = queue->copy(element);
     newNode->next = NULL;
-
-    if (q->rear == NULL) {
-        q->front = q->rear = newNode;
+    if (queue->rear == NULL) {
+        queue->front = queue->rear = newNode;
     } else {
-        q->rear->next = newNode;
-        q->rear = newNode;
+        queue->rear->next = newNode;
+        queue->rear = newNode;
     }
     return QUEUE_OK;
 }
 
-QueueResult dequeue(Queue *q, Element *dataOut) {
-    if (!q || q->front == NULL) {
-        return QUEUE_ERROR_EMPTY;
-    }
+QueueResult dequeue(Queue queue, Element *element) {
+    if (!queue || queue->front == NULL) return QUEUE_ERROR_EMPTY;
 
-    Node *temp = q->front;
-    *dataOut = temp->data; // Return data to caller
-    q->front = q->front->next;
-
-    if (q->front == NULL) {
-        q->rear = NULL;
+    Node *temp = queue->front;
+    *element = temp->data;
+    queue->front = queue->front->next;
+    if (queue->front == NULL) {
+        queue->rear = NULL;
     }
 
     free(temp);
     return QUEUE_OK;
 }
 
-void clearQueue(Queue *q) {
-    Node *current = q->front;
-    Node *next;
-
-    while (current != NULL) {
-        next = current->next;
-        q->freeFunc(current->data); // Free the element
+void clearQueue(Queue queue) {
+    Node *current = queue->front;
+    while (current) {
+        Node *next = current->next;
+        queue->free(current->data);
         free(current);
         current = next;
     }
-
-    q->front = q->rear = NULL;
+    queue->front = queue->rear = NULL;
 }
 
+void freeQueue(Queue queue) {
+    if (queue) {
+        clearQueue(queue);
+        free(queue);
+    }
+}
