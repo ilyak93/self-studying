@@ -1,12 +1,30 @@
 // stack.c
-#include "Stack.h"
+#include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-// Function to create a new node
+ struct stack_t {
+    Node top;
+    CopyFunction copyFunc;
+    FreeFunction freeFunc;
+} stack_t;
 
-static Node* createNode(Element data, CopyFunction copyFunc) {
-    Node* newNode = (Node*) malloc(sizeof(Node));
+// Function to create a new stack
+Stack createStack(CopyFunction copyFunc, FreeFunction freeFunc) {
+    Stack s = (Stack) malloc(sizeof(*s));
+    if (!s) {
+        fprintf(stderr, "Failed to allocate memory for the stack\n");
+        exit(EXIT_FAILURE);
+    }
+    s->top = NULL;
+    s->copyFunc = copyFunc;
+    s->freeFunc = freeFunc;
+    return s;
+}
+
+// Function to create a new node
+static Node createNode(Element data, CopyFunction copyFunc) {
+    Node newNode = (Node) malloc(sizeof(*newNode));
     if (!newNode) {
         return NULL;
     }
@@ -19,21 +37,14 @@ static Node* createNode(Element data, CopyFunction copyFunc) {
     return newNode;
 }
 
-// Initialize the stack
-void initStack(Stack* s, CopyFunction copyFunc, FreeFunction freeFunc) {
-    s->top = NULL;
-    s->copyFunc = copyFunc;
-    s->freeFunc = freeFunc;
-}
-
 // Check if the stack is empty
-bool isEmpty(Stack* s) {
+bool isEmpty(Stack s) {
     return s->top == NULL;
 }
 
 // Push an element to the stack
-StackStatus push(Stack* s, Element data) {
-    Node* newNode = createNode(data, s->copyFunc);
+StackStatus push(Stack s, Element data) {
+    Node newNode = createNode(data, s->copyFunc);
     if (newNode == NULL) {
         return STACK_OVERFLOW;
     }
@@ -43,11 +54,11 @@ StackStatus push(Stack* s, Element data) {
 }
 
 // Pop an element from the stack
-StackStatus pop(Stack* s, Element* data) {
+StackStatus pop(Stack s, Element* data) {
     if (isEmpty(s)) {
         return STACK_EMPTY;
     }
-    Node* temp = s->top;
+    Node temp = s->top;
     *data = temp->data;
     s->top = temp->next;
     free(temp);
@@ -55,7 +66,7 @@ StackStatus pop(Stack* s, Element* data) {
 }
 
 // Peek the top element of the stack
-StackStatus peek(Stack* s, Element* data) {
+StackStatus peek(Stack s, Element* data) {
     if (isEmpty(s)) {
         return STACK_EMPTY;
     }
@@ -64,9 +75,9 @@ StackStatus peek(Stack* s, Element* data) {
 }
 
 // Free the entire stack
-void freeStack(Stack* s) {
-    Node* current = s->top;
-    Node* temp;
+void freeStack(Stack s) {
+    Node current = s->top;
+    Node temp;
     while (current != NULL) {
         temp = current;
         current = current->next;

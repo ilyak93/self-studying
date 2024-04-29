@@ -9,20 +9,14 @@ typedef void* Element;
 typedef void* (*CopyFunction)(const void*);
 typedef void (*FreeFunction)(void*);
 
-// Node structure for the stack
-typedef struct Node {
+typedef struct node_t {
     Element data;
-    struct Node* next;
-} Node;
+    struct node_t* next; // Use struct node_t* instead of Node to resolve forward declaration issues
+} node_t;
 
+typedef node_t* Node; // Define Node as a pointer to node_t
 
-
-// Stack structure
-typedef struct Stack {
-    Node* top;
-    CopyFunction copyFunc;
-    FreeFunction freeFunc;
-} Stack;
+typedef struct stack_t* Stack; // Define Stack as a pointer to stack_t
 
 // Error codes
 typedef enum {
@@ -33,13 +27,11 @@ typedef enum {
 } StackStatus;
 
 // Function prototypes
-void initStack(Stack* s, CopyFunction copyFunc, FreeFunction freeFunc);
-bool isEmpty(Stack* s);
-StackStatus push(Stack* s, Element data);
-StackStatus pop(Stack* s, Element* data);
-StackStatus peek(Stack* s, Element* data);
-void freeStack(Stack* s);
-void* copyInt(const void* src);
-void freeInt(void* data);
+Stack createStack(CopyFunction copyFunc, FreeFunction freeFunc);
+void freeStack(Stack s);
+bool isEmpty(Stack s);
+StackStatus push(Stack s, Element data);
+StackStatus pop(Stack s, Element* data);
+StackStatus peek(Stack s, Element* data);
 
-#endif // STACK_
+#endif // STACK_H

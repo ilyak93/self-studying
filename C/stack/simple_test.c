@@ -18,33 +18,32 @@ void freeInt(void* data) {
 
 // Main function to demonstrate stack operations
 int main() {
-    Stack myStack;
-    initStack(&myStack, copyInt, freeInt);
+    Stack myStack = createStack(copyInt, freeInt);
 
     int a = 10;
     int b = 20;
     int c = 30;
     void* poppedData;
 
-    push(&myStack, &a);
-    push(&myStack, &b);
-    push(&myStack, &c);
+    push(myStack, &a);
+    push(myStack, &b);
+    push(myStack, &c);
 
-    if (peek(&myStack, &poppedData) == STACK_OK) {
+    if (peek(myStack, &poppedData) == STACK_OK) {
         printf("Top element is %d\n", *(int*)poppedData);
     }
 
-    if (pop(&myStack, &poppedData) == STACK_OK) {
+    if (pop(myStack, &poppedData) == STACK_OK) {
         printf("Popped element is %d\n", *(int*)poppedData);
         freeInt(poppedData);
     }
 
-    if (peek(&myStack, &poppedData) == STACK_OK) {
+    if (peek(myStack, &poppedData) == STACK_OK) {
         printf("Top element is now %d\n", *(int*)poppedData);
     }
 
     // Free the remaining elements in the stack
-    freeStack(&myStack);
+    freeStack(myStack);
 
     return 0;
 }

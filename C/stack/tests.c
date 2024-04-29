@@ -1,8 +1,8 @@
+#include "Stack.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "Stack.h"
 
-// Function to copy an integer
+// Function to copy an integer (for testing)
 void* copyInt(const void* src) {
     int* newInt = malloc(sizeof(int));
     if (newInt) {
@@ -16,97 +16,69 @@ void freeInt(void* data) {
     free(data);
 }
 
-// Function to report test results
-void reportTest(const char* testName, int passed) {
-    if (passed) {
+// Simple assertion function to report test results
+void assertTest(const char* testName, int condition) {
+    if (condition) {
         printf("%s: PASS\n", testName);
     } else {
         printf("%s: FAIL\n", testName);
     }
 }
 
-// Define a helper function for comparing integers
-int assertIntEqual(int expected, int actual) {
-    return expected == actual;
-}
-
-void test_initStack() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
-    reportTest("test_initStack", s.top == NULL && s.copyFunc != NULL && s.freeFunc != NULL);
-}
-
-void test_push() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
+// Test pushing and popping items
+void testPushPop() {
+    Stack s = createStack(copyInt, freeInt);
     int a = 10;
-    push(&s, &a);
-    int result = assertIntEqual(10, *(int*)s.top->data);
-    freeStack(&s);
-    reportTest("test_push", result);
+    int b = 20;
+    push(s, &a);
+    push(s, &b);
+
+    int* topValue;
+    StackStatus status = pop(s, (Element*)&topValue);
+    assertTest("testPushPop - Should pop the last pushed value (20)", status == STACK_OK && *topValue == 20);
+    freeInt(topValue); // Remember to free after popping
+
+    status = pop(s, (Element*)&topValue);
+    assertTest("testPushPop - Should pop the next value (10)", status == STACK_OK && *topValue == 10);
+    freeInt(topValue); // Remember to free after popping
+
+    freeStack(s);
 }
 
-void test_pop() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
-    int a = 10, b = 20;
-    void* data;
-
-    push(&s, &a);
-    push(&s, &b);
-
-    pop(&s, &data);
-    int result = assertIntEqual(20, *(int*)data) && (s.top != NULL && *(int*)s.top->data == 10);
-    freeInt(data);
-    freeStack(&s);
-    reportTest("test_pop", result);
-}
-
-void test_peek() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
-    int a = 10;
-    void* data;
-
-    push(&s, &a);
-    peek(&s, &data);
-    int result = assertIntEqual(10, *(int*)data);
-    freeStack(&s);
-    reportTest("test_peek", result);
-}
-
-void test_isEmpty() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
-    int result = isEmpty(&s); // Should be true
+// Test isEmpty function
+void testIsEmpty() {
+    Stack s = createStack(copyInt, freeInt);
+    assertTest("testIsEmpty - Stack should be empty initially", isEmpty(s));
 
     int a = 10;
-    push(&s, &a);
-    result &= !isEmpty(&s); // Should be false now
+    push(s, &a);
+    assertTest("testIsEmpty - Stack should not be empty after push", !isEmpty(s));
 
-    freeStack(&s);
-    reportTest("test_isEmpty", result);
+    int* topValue;
+    pop(s, (Element*)&topValue);
+    assertTest("testIsEmpty - Stack should be empty after pop", isEmpty(s));
+    freeInt(topValue);
+
+    freeStack(s);
 }
 
-void test_freeStack() {
-    Stack s;
-    initStack(&s, copyInt, freeInt);
-    int a = 10, b = 20;
+// Test peek function
+void testPeek() {
+    Stack s = createStack(copyInt, freeInt);
+    int a = 30;
+    push(s, &a);
 
-    push(&s, &a);
-    push(&s, &b);
-    freeStack(&s);
+    int* topValue;
+    StackStatus status = peek(s, (Element*)&topValue);
+    assertTest("testPeek - Top value should be peekable and correct", status == STACK_OK && *topValue == 30);
 
-    // The real test would require memory checking tools, but for simplicity:
-    reportTest("test_freeStack", s.top == NULL);
+    freeStack(s);
 }
 
+// Main function to run all tests
 int main() {
-    test_initStack();
-    test_push();
-    test_pop();
-    test_peek();
-    test_isEmpty();
-    test_freeStack();
+    testPushPop();
+    testIsEmpty();
+    testPeek();
     return 0;
 }
