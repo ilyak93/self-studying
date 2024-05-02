@@ -8,16 +8,14 @@ public:
     std::vector<T> keys;
     std::vector<BTreeNode*> children;
     bool leaf;
+    int childKeySum;
 
     BTreeNode(bool leaf) : leaf(leaf) {}
 
     void insertNonFull(const T& key, Comparator comp);
     void splitChild(int index, BTreeNode* child, Comparator comp);
     void print(int level);
-    //bool isLeaf(){return leaf;}
-
 };
-
 template <typename T, int B, typename Comparator = std::less<T>>
 class BTree {
 private:
@@ -28,9 +26,17 @@ public:
     BTree() : root(nullptr) {}
 
     void insert(const T& key);
+    void remove(const T& key);
     BTreeNode<T, B, Comparator>* search(const T& key);
     void print();
     BTreeNode<T, B, Comparator>* findParent(BTreeNode<T, B, Comparator>* node, BTreeNode<T, B, Comparator>* child);
+
+private:
+    void remove(BTreeNode<T, B, Comparator>* node, const T& key);
+    void merge(BTreeNode<T, B, Comparator>* node, int index);
+    void fill(BTreeNode<T, B, Comparator>* node, int index);
+    void borrowFromPrev(BTreeNode<T, B, Comparator>* node, int index);
+    void borrowFromNext(BTreeNode<T, B, Comparator>* node, int index);
 };
 
 template <typename T, int B, typename Comparator>
@@ -57,6 +63,11 @@ void BTreeNode<T, B, Comparator>::insertNonFull(const T& key, Comparator comp) {
         }
 
         children[i]->insertNonFull(key, comp);
+
+        // Update childKeySum after the recursive call
+        childKeySum = 0;
+        for (const auto& child : children)
+            childKeySum += child->keys.size();
     }
 }
 
@@ -77,6 +88,10 @@ void BTreeNode<T, B, Comparator>::splitChild(int index, BTreeNode* child, Compar
 
     children.insert(children.begin() + index + 1, newChild);
     keys.insert(keys.begin() + index, child->keys[(B - 1) / 2]);
+
+    childKeySum = 0;
+    for (const auto& child : children)
+        childKeySum += child->keys.size();
 }
 
 template <typename T, int B, typename Comparator>
@@ -197,6 +212,159 @@ void BTree<T, B, Comparator>::print() {
         std::cout << "Empty tree" << std::endl;
 }
 
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::remove(const T& key) {
+    remove(root, key);
+}
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* node, const T& key) {
+    if (node == nullptr)
+        return;
+
+    int i = std::lower_bound(node->keys.begin(), node->keys.end(), key, comp) - node->keys.begin();
+
+    if (i < node->keys.size() && !(comp(key, node->keys[i]) || comp(node->keys[i], key))) {
+        if (node->leaf) {
+            node->keys.erase(node->keys.begin() + i);
+        } else {
+            BTreeNode<T, B, Comparator>* leftChild = node->children[i];
+            BTreeNode<T, B, Comparator>* rightChild = node->children[i + 1];
+
+            if (leftChild->keys.size() >= (B + 1) / 2) {
+                T predKey = leftChild->keys.back();
+                node->keys[i] = predKey;
+                remove(leftChild, predKey);
+            } else if (rightChild->keys.size() >= (B + 1) / 2) {
+                T succKey = rightChild->keys.front();
+                node->keys[i] = succKey;
+                remove(rightChild, succKey);
+            } else {
+                merge(node, i);
+                remove(leftChild, key);
+            }
+
+            // Update childKeySum after removal or merging
+            node->childKeySum = 0;
+            for (const auto& child : node->children)
+                node->childKeySum += child->keys.size();
+        }
+    } else {
+        if (node->leaf)
+            return;
+
+        bool flag = (i == node->keys.size());
+
+        BTreeNode<T, B, Comparator>* child = node->children[i];
+
+        if (child->keys.size() < (B + 1) / 2) {
+            fill(node, i);
+            // Update childKeySum after filling
+            node->childKeySum = 0;
+            for (const auto& child : node->children)
+                node->childKeySum += child->keys.size();
+        }
+
+        if (flag && i > node->keys.size())
+            remove(node->children[i - 1], key);
+        else
+            remove(node->children[i], key);
+    }
+
+    if (node->keys.empty() && node == root) {
+        if (node->leaf) {
+            delete root;
+            root = nullptr;
+        } else if (node->keys.empty()) {
+            root = node->children.front();
+            delete node;
+        }
+    }
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::merge(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* leftChild = node->children[index];
+    BTreeNode<T, B, Comparator>* rightChild = node->children[index + 1];
+
+    leftChild->keys.push_back(node->keys[index]);
+    node->keys.erase(node->keys.begin() + index);
+
+    for (const auto& key : rightChild->keys)
+        leftChild->keys.push_back(key);
+
+    if (!leftChild->leaf) {
+        for (auto& child : rightChild->children)
+            leftChild->children.push_back(child);
+    }
+
+    node->children.erase(node->children.begin() + index + 1);
+    delete rightChild;
+
+    // Update childKeySum of the parent node after merging
+    node->childKeySum = 0;
+    for (const auto& child : node->children)
+        node->childKeySum += child->keys.size();
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::fill(BTreeNode<T, B, Comparator>* node, int index) {
+    if (index != 0 && node->children[index - 1]->keys.size() >= (B + 1) / 2)
+        borrowFromPrev(node, index);
+    else if (index != node->keys.size() && node->children[index + 1]->keys.size() >= (B + 1) / 2)
+        borrowFromNext(node, index);
+    else {
+        if ((node->childKeySum - 1 < B) &&  (node->childKeySum - 1 >= (B + 1) / 2)) return;
+        if (index != node->keys.size())
+            merge(node, index);
+        else
+            merge(node, index - 1);
+    }
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::borrowFromPrev(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* child = node->children[index];
+    BTreeNode<T, B, Comparator>* sibling = node->children[index - 1];
+
+    child->keys.insert(child->keys.begin(), node->keys[index - 1]);
+
+    if (!child->leaf)
+        child->children.insert(child->children.begin(), sibling->children.back());
+
+    node->keys[index - 1] = sibling->keys.back();
+    sibling->keys.pop_back();
+
+    if (!sibling->leaf)
+        sibling->children.pop_back();
+
+    // Update childKeySum of the parent node after borrowing
+    node->childKeySum = 0;
+    for (const auto& child : node->children)
+        node->childKeySum += child->keys.size();
+}
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::borrowFromNext(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* child = node->children[index];
+    BTreeNode<T, B, Comparator>* sibling = node->children[index + 1];
+
+    child->keys.push_back(node->keys[index]);
+
+    if (!child->leaf)
+        child->children.push_back(sibling->children.front());
+
+    node->keys[index] = sibling->keys.front();
+    sibling->keys.erase(sibling->keys.begin());
+
+    if (!sibling->leaf)
+        sibling->children.erase(sibling->children.begin());
+
+    // Update childKeySum of the parent node after borrowing
+    node->childKeySum = 0;
+    for (const auto& child : node->children)
+        node->childKeySum += child->keys.size();
+}
+
+
 int main() {
     BTree<int, 3> tree;
 
@@ -215,8 +383,25 @@ int main() {
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
+
+    // Remove keys
+    tree.remove(30);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.remove(50);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.remove(70);
+
+    // Print the tree after removal
+    std::cout << "B-Tree after removal:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
     // Search for a key
-    int key = 0;
+    int key = 40;
     BTreeNode<int, 3>* result = tree.search(key);
     if (result != nullptr)
         std::cout << "Key " << key << " found in the tree" << std::endl;
