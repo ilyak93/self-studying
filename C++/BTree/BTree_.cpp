@@ -2,6 +2,13 @@
 #include <vector>
 #include <algorithm>
 
+
+template <typename Iter, typename T, typename Comparator>
+int binarySearch(Iter begin, Iter end, const T& key, Comparator comp) {
+    auto it = std::lower_bound(begin, end, key, comp);
+    return std::distance(begin, it);
+}
+
 template <typename T, int B, typename Comparator = std::less<T>>
 class BTreeNode {
 public:
@@ -9,73 +16,27 @@ public:
     std::vector<BTreeNode*> children;
     bool leaf;
 
+    struct BTreeNodeComparator {
+        Comparator comp;
+
+        bool operator()(const BTreeNode<T, B, Comparator>* node, const T& key) const {
+            return comp(node->keys.front(), key);
+        }
+
+        bool operator()(const T& key, const BTreeNode<T, B, Comparator>* node) const {
+            return comp(key, node->keys.front());
+        }
+    };
+
     BTreeNode(bool leaf) : leaf(leaf) {}
 
     void insertNonFull(const T& key, Comparator comp);
     void splitChild(int index, BTreeNode* child, Comparator comp);
     void print(int level);
-    //bool isLeaf(){return leaf;}
-    int findIndexToInsert(std::vector<BTreeNode*> vec, const T& key);
-    int findIndexToInsert(std::vector<T> vec, const T& key);
-private:
-    int binSearch(std::vector<BTreeNode*>& childrenArray, const T& key);
-    int binSearch(std::vector<T>& keysArray, const T& key);
+
+
 
 };
-
-template <typename T, int B, typename Comparator>
-int BTreeNode<T, B, Comparator>::binSearch(std::vector<T>& keysArray, const T& key){
-    if (keysArray.size() < 1) return -1;
-    Comparator comp;
-    if(keysArray.size() == 1) return comp(keysArray[0], key) ? 1 : 0;
-    T left = keysArray.front();
-    T right = keysArray.back();
-    if(comp(key, left)) return 0;
-    if(comp(right, key) ||
-       (!comp(right, key) && !comp(key, right))) return keysArray.size();
-    int l = 0;
-    int r = keysArray.size() - 1;
-    int mid = 0;
-    while(l < r){
-        mid = (l + r) / 2;
-        if(comp(key, keysArray[mid])) r -= mid;
-        else l += mid;
-    }
-    return mid;
-
-}
-
-template <typename T, int B, typename Comparator>
-int BTreeNode<T, B, Comparator>::binSearch(std::vector<BTreeNode*>& childrenArray, const T& key){
-    if (childrenArray.size() < 1) return -1;
-    Comparator comp;
-    if(childrenArray.size() == 1) return comp(childrenArray[0]->keys.front(), key) ? 1 : 0;
-    BTreeNode left = *(childrenArray.front());
-    BTreeNode right = *(childrenArray.back());
-    if(comp(key, left.keys.front())) return 0;
-    if(comp(right.keys.front(), key) ||
-      (!comp(right.keys.front(), key) && !comp(key, right.keys.front()))) return childrenArray.size();
-    int l = 0;
-    int r = childrenArray.size() - 1;
-    int mid = 1;
-    while(l < r - 1){
-        mid = (l + r) / 2;
-        if(comp(key, childrenArray[mid]->keys.front())) r -= mid;
-        else l += mid;
-    }
-    return mid;
-
-}
-
-template <typename T, int B, typename Comparator>
-int BTreeNode<T, B, Comparator>::findIndexToInsert(std::vector<BTreeNode*> vec, const T& key) {
-    return this->binSearch(vec, key);
-}
-
-template <typename T, int B, typename Comparator>
-int BTreeNode<T, B, Comparator>::findIndexToInsert(std::vector<T> vec, const T& key) {
-    return this->binSearch(vec, key);
-}
 
 template <typename T, int B, typename Comparator = std::less<T>>
 class BTree {
@@ -159,12 +120,15 @@ void BTree<T, B, Comparator>::insert(const T& key) {
 
     BTreeNode<T, B, Comparator>* leaf = new BTreeNode<T, B, Comparator>(true);
     leaf->keys.push_back(key);
-    int indexBeforeInsert = node->findIndexToInsert(node->children, key);
+    int indexBeforeInsert = binarySearch(
+            node->children.begin(),node->children.end(), key,
+            typename BTreeNode<T, B, Comparator>::BTreeNodeComparator{comp}
+            );
     node->children.emplace(node->children.begin() + indexBeforeInsert, leaf);
     //std::sort(node->keys.begin(), node->keys.end(), comp);
 
     if(node->children.size() - 1 != node->keys.size()){
-        int idx = node->findIndexToInsert(node->keys, key);
+        int idx = binarySearch(node->keys.begin(), node->keys.begin(), key, comp);
         node->keys.emplace(node->keys.begin() + idx, key);
     }
 
