@@ -57,8 +57,8 @@ int BTreeNode<T, B, Comparator>::binSearch(std::vector<BTreeNode*>& childrenArra
       (!comp(right.keys.front(), key) && !comp(key, right.keys.front()))) return childrenArray.size();
     int l = 0;
     int r = childrenArray.size() - 1;
-    int mid = 0;
-    while(l < r){
+    int mid = 1;
+    while(l < r - 1){
         mid = (l + r) / 2;
         if(comp(key, childrenArray[mid]->keys.front())) r -= mid;
         else l += mid;
@@ -283,9 +283,9 @@ int main() {
     tree.insert(2);
     tree.insert(1);
     tree.insert(10);
-    //tree.insert(14);
-    //tree.insert(25);
-    //tree.insert(22);
+    tree.insert(14);
+    tree.insert(25);
+    tree.insert(22);
 
     // Print the tree
     std::cout << "B-Tree:" << std::endl;
