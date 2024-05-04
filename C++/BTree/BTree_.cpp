@@ -44,6 +44,12 @@ private:
     BTreeNode<T, B, Comparator>* root;
     Comparator comp;
 
+    void remove(BTreeNode<T, B, Comparator>* node, const T& key);
+    void merge(BTreeNode<T, B, Comparator>* node, int index);
+    void fill(BTreeNode<T, B, Comparator>* node, int index);
+    void borrowFromPrev(BTreeNode<T, B, Comparator>* node, int index);
+    void borrowFromNext(BTreeNode<T, B, Comparator>* node, int index);
+
 public:
     BTree() : root(nullptr) {}
 
@@ -51,7 +57,158 @@ public:
     BTreeNode<T, B, Comparator>* search(const T& key);
     void print();
     BTreeNode<T, B, Comparator>* findParent(BTreeNode<T, B, Comparator>* node, BTreeNode<T, B, Comparator>* child);
+    void remove(const T& key);
 };
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::remove(const T& key) {
+    if (root == nullptr)
+        return;
+
+    remove(root, key);
+
+    if (root->keys.empty()) {
+        BTreeNode<T, B, Comparator>* oldRoot = root;
+        if (root->leaf)
+            root = nullptr;
+        else
+            root = root->children[0];
+        delete oldRoot;
+    }
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& key) {
+
+
+    BTreeNode<T, B, Comparator>* node = root;
+    int i = 0;
+    do {
+        i = std::upper_bound(node->keys.begin(), node->keys.end(), key, comp) - node->keys.begin();
+    } while(!node->children[i]->leaf && (node = node->children[i]));
+
+    if(comp(node->children[i]->keys.front(), key) || comp(node->children[i]->keys.front(), key)) return;
+
+    node->children[i]->keys.erase(node->children[i]->keys.begin());
+
+    node->children.erase(node->children.begin() + i);
+    int distance = i ? i - 1 : i;
+    if( node->keys.size() > B / 2) node->keys.erase(node->keys.begin() + distance);
+
+    if(node->children.size() > B / 2) return;
+
+    T& smallestKey = node->keys.front();
+    T& biggestKey = node->keys.back();
+
+    BTreeNode<T, B, Comparator>* parent = findParent(root, node);
+
+    if(parent->children[0] != node) {
+        int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
+        int leftBrotherIdx = t - 1;
+        BTreeNode<T, B, Comparator>* leftBrother = parent->children[leftBrotherIdx];
+        do {
+            i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
+        } while(!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
+        if(leftBrother->children.size() > B / 2 + 1){
+            //remove leftBrother->children[i];
+            //correct leftBrother node
+            //insert leftBrother->children[i] key into node->children and correct node
+            //return
+        }
+    }
+    if(parent->children[parent->children.size() - 1] != node) {
+        int g = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
+        int rightBrotherIdx = g - 1;
+        BTreeNode<T, B, Comparator>* rightBrother = parent->children[rightBrotherIdx];
+        do {
+            i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
+        } while(!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
+        if(rightBrother->children.size() > B / 2 + 1){
+            //remove rightBrother->children[i];
+            //correct rightBrother node
+            //insert rightBrother->children[i] key into node->children and correct node
+            //return
+        }
+    }
+    //BTreeNode<T, B, Comparator>* leftChild = node->children[i];
+    //BTreeNode<T, B, Comparator>* rightChild = node->children[i + 1];
+    
+    //T oldKey = node->keys[i];
+    //merge(node, i);
+    //remove(node->children[i], oldKey);
+
+    //bool flag = (i == node->keys.size());
+
+    //BTreeNode<T, B, Comparator>* child = node->children[i];
+    //if (child->keys.size() < B / 2)
+    //    fill(node, i);
+
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::fill(BTreeNode<T, B, Comparator>* node, int index) {
+    if (index != 0 && node->children[index - 1]->keys.size() >= B / 2)
+        borrowFromPrev(node, index);
+    else if (index != node->keys.size() && node->children[index + 1]->keys.size() >= B / 2)
+        borrowFromNext(node, index);
+    else {
+        if (index != node->keys.size())
+            merge(node, index);
+        else
+            merge(node, index - 1);
+    }
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::borrowFromPrev(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* child = node->children[index];
+    BTreeNode<T, B, Comparator>* sibling = node->children[index - 1];
+
+    child->keys.insert(child->keys.begin(), node->keys[index - 1]);
+
+    if (!child->leaf)
+        child->children.insert(child->children.begin(), sibling->children.back());
+
+    node->keys[index - 1] = sibling->keys.back();
+    sibling->keys.pop_back();
+
+    if (!sibling->leaf)
+        sibling->children.pop_back();
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::borrowFromNext(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* child = node->children[index];
+    BTreeNode<T, B, Comparator>* sibling = node->children[index + 1];
+
+    child->keys.push_back(node->keys[index]);
+
+    if (!child->leaf)
+        child->children.push_back(sibling->children[0]);
+
+    node->keys[index] = sibling->keys[0];
+    sibling->keys.erase(sibling->keys.begin());
+
+    if (!sibling->leaf)
+        sibling->children.erase(sibling->children.begin());
+}
+
+template <typename T, int B, typename Comparator>
+void BTree<T, B, Comparator>::merge(BTreeNode<T, B, Comparator>* node, int index) {
+    BTreeNode<T, B, Comparator>* child = node->children[index];
+    BTreeNode<T, B, Comparator>* sibling = node->children[index + 1];
+
+    child->keys.push_back(node->keys[index]);
+    child->keys.insert(child->keys.end(), sibling->keys.begin(), sibling->keys.end());
+
+    if (!child->leaf)
+        child->children.insert(child->children.end(), sibling->children.begin(), sibling->children.end());
+
+    node->keys.erase(node->keys.begin() + index);
+    node->children.erase(node->children.begin() + index + 1);
+
+    delete sibling;
+}
 
 
 
@@ -248,6 +405,30 @@ int main() {
     tree.insert(14);
     tree.insert(25);
     tree.insert(22);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(22);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.remove(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+
+    tree.remove(70);
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(60);
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(40);
 
     // Print the tree
     std::cout << "B-Tree:" << std::endl;
