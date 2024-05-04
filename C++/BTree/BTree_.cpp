@@ -128,11 +128,9 @@ void BTree<T, B, Comparator>::insert(const T& key) {
     //std::sort(node->keys.begin(), node->keys.end(), comp);
 
     if(node->children.size() - 1 != node->keys.size()){
-        int idx = binarySearch(node->keys.begin(), node->keys.begin(), key, comp);
+        int idx = binarySearch(node->keys.begin(), node->keys.end(), key, comp);
         node->keys.emplace(node->keys.begin() + idx, key);
     }
-
-    BTreeNode<T, B, Comparator>* inserted = node;
 
 
     while (node != root && node->keys.size() > B - 1) {
