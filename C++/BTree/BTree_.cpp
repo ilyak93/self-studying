@@ -33,10 +33,33 @@ public:
     void insertNonFull(const T& key, Comparator comp);
     void splitChild(int index, BTreeNode* child, Comparator comp);
     void print(int level);
-
-
-
+    BTreeNode* getLeafParent(const T& key, int& i);
+    void removeLeaf(int i);
 };
+
+template <typename T, int B, typename Comparator>
+BTreeNode<T, B, Comparator>* BTreeNode<T, B, Comparator>::getLeafParent(const T& key, int& i) {
+    //assert this != nullptr
+    i = 0;
+    BTreeNode<T, B, Comparator>* node = this;
+    Comparator comp;
+    do {
+        i = std::upper_bound(node->keys.begin(), node->keys.end(), key, comp) - node->keys.begin();
+    } while(!node->children[i]->leaf && (node = node->children[i]));
+
+    if(comp(node->children[i]->keys.front(), key) || comp(node->children[i]->keys.front(), key)) return nullptr;
+    return node;
+}
+
+template <typename T, int B, typename Comparator>
+void BTreeNode<T, B, Comparator>::removeLeaf(int child_idx){
+    //assert this and child_idx >= 0 and <= children.size()
+    this->children[child_idx]->keys.erase(this->children[child_idx]->keys.begin());
+    this->children.erase(this->children.begin() + child_idx);
+    int distance = child_idx ? child_idx - 1 : child_idx;
+    if( this->keys.size() > B / 2) this->keys.erase(this->keys.begin() + distance);
+}
+
 
 template <typename T, int B, typename Comparator = std::less<T>>
 class BTree {
@@ -82,18 +105,12 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
 
 
     BTreeNode<T, B, Comparator>* node = root;
-    int i = 0;
-    do {
-        i = std::upper_bound(node->keys.begin(), node->keys.end(), key, comp) - node->keys.begin();
-    } while(!node->children[i]->leaf && (node = node->children[i]));
+    int child_idx = -1;
+    BTreeNode<T, B, Comparator>* leafParent = root->getLeafParent(key, child_idx);
 
-    if(comp(node->children[i]->keys.front(), key) || comp(node->children[i]->keys.front(), key)) return;
+    leafParent->removeLeaf(child_idx);
 
-    node->children[i]->keys.erase(node->children[i]->keys.begin());
 
-    node->children.erase(node->children.begin() + i);
-    int distance = i ? i - 1 : i;
-    if( node->keys.size() > B / 2) node->keys.erase(node->keys.begin() + distance);
 
     if(node->children.size() > B / 2) return;
 
@@ -106,6 +123,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
         int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
         int leftBrotherIdx = t - 1;
         BTreeNode<T, B, Comparator>* leftBrother = parent->children[leftBrotherIdx];
+        int i = 0;
         do {
             i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
         } while(!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
@@ -120,6 +138,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
         int g = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
         int rightBrotherIdx = g - 1;
         BTreeNode<T, B, Comparator>* rightBrother = parent->children[rightBrotherIdx];
+        int i = 0;
         do {
             i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
         } while(!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
@@ -132,7 +151,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
     }
     //BTreeNode<T, B, Comparator>* leftChild = node->children[i];
     //BTreeNode<T, B, Comparator>* rightChild = node->children[i + 1];
-    
+
     //T oldKey = node->keys[i];
     //merge(node, i);
     //remove(node->children[i], oldKey);
