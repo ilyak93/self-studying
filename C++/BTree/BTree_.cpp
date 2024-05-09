@@ -136,7 +136,10 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
             i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
         } while(!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
         if(leftBrother->children.size() > B / 2 + 1) {
+            T key = leftBrother->keys[i-1];
             leftBrother->removeLeaf(i);
+            leafParent->insertNonFull(key, comp);
+            return ;
             //correct leftBrother node
             //insert leftBrother->children[i] key into node->children and correct node
             //return
@@ -241,15 +244,15 @@ void BTree<T, B, Comparator>::merge(BTreeNode<T, B, Comparator>* node, int index
 
 template <typename T, int B, typename Comparator>
 void BTreeNode<T, B, Comparator>::insertNonFull(const T& key, Comparator comp) {
-    int i = keys.size() - 1;
-
-    if (leaf) {
-        keys.resize(keys.size() + 1);
-        while (i >= 0 && comp(key, keys[i])) {
-            keys[i + 1] = keys[i];
+    int i = children.size() - 1;
+    if (children.front()->leaf) {
+        children.resize(children.size() + 1);
+        while (i >= 0 && comp(key, children[i]->keys.front())) {
+            children[i + 1] = children[i];
             --i;
         }
-        keys[i + 1] = key;
+        children[i + 1] = new BTreeNode<T, B, Comparator>(true);
+        children[i + 1]->keys.push_back(key);
     } else {
         while (i >= 0 && comp(key, keys[i]))
             --i;
@@ -432,6 +435,7 @@ int main() {
     tree.insert(14);
     tree.insert(25);
     tree.insert(22);
+    tree.insert(4);
 
     std::cout << "B-Tree:" << std::endl;
     tree.print();
