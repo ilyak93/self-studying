@@ -127,10 +127,23 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
 
     BTreeNode<T, B, Comparator>* parent = findParent(root, leafParent);
 
+    BTreeNode<T, B, Comparator>* leftBrother = nullptr;
+    BTreeNode<T, B, Comparator>* rightBrother = nullptr;
+
+
     if(parent->children[0] != leafParent) {
         int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
         int leftBrotherIdx = t - 1;
-        BTreeNode<T, B, Comparator>* leftBrother = parent->children[leftBrotherIdx];
+        leftBrother = parent->children[leftBrotherIdx];
+    }
+    if(parent->children[parent->children.size() - 1] != leafParent) {
+        int t = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
+        int rightBrotherIdx = t + 1;
+        rightBrother = parent->children[rightBrotherIdx];
+    }
+    if((leftBrother && rightBrother &&
+       leftBrother->children.size() > rightBrother->children.size()) ||
+       rightBrother == nullptr) {
         int i = 0;
         do {
             i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
@@ -139,25 +152,22 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
             T key = leftBrother->keys[i-1];
             leftBrother->removeLeaf(i);
             leafParent->insertNonFull(key, comp);
-            return ;
-            //correct leftBrother node
-            //insert leftBrother->children[i] key into node->children and correct node
-            //return
+            return;
         }
-    }
-    if(parent->children[parent->children.size() - 1] != leafParent) {
-        int g = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
-        int rightBrotherIdx = g - 1;
-        BTreeNode<T, B, Comparator>* rightBrother = parent->children[rightBrotherIdx];
+    } else if ((leftBrother && rightBrother &&
+                leftBrother->children.size() <=
+                rightBrother->children.size()) ||
+                leftBrother == nullptr) {
         int i = 0;
         do {
             i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
         } while(!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
         if(rightBrother->children.size() > B / 2 + 1){
-            //remove rightBrother->children[i];
-            //correct rightBrother node
-            //insert rightBrother->children[i] key into node->children and correct node
-            //return
+            int idx = i >= 0 ? i : 0;
+            T key = rightBrother->children[idx]->keys.front();
+            rightBrother->removeLeaf(i);
+            leafParent->insertNonFull(key, comp);
+            return ;
         }
     }
     //BTreeNode<T, B, Comparator>* leftChild = node->children[i];
@@ -441,11 +451,11 @@ int main() {
     tree.print();
     std::cout << std::endl;
 
-    tree.remove(22);
+    tree.remove(3);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
-    tree.remove(14);
+    tree.remove(4);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
