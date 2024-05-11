@@ -487,17 +487,6 @@ int main() {
     tree.print();
     std::cout << std::endl;
 
-
-    tree.remove(70);
-    tree.print();
-    std::cout << std::endl;
-
-    tree.remove(60);
-    tree.print();
-    std::cout << std::endl;
-
-    tree.remove(40);
-
     // Print the tree
     std::cout << "B-Tree:" << std::endl;
     tree.print();
