@@ -149,7 +149,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
             i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
         } while(!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
         if(leftBrother->children.size() > B / 2 + 1) {
-            T key = leftBrother->keys[i-1];
+            T key =  leftBrother->children[i]->keys.front();
             leftBrother->removeLeaf(i);
             leafParent->insertNonFull(key, comp);
             return;
@@ -163,8 +163,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
             i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
         } while(!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
         if(rightBrother->children.size() > B / 2 + 1){
-            int idx = i >= 0 ? i : 0;
-            T key = rightBrother->children[idx]->keys.front();
+            T key = rightBrother->children[i]->keys.front();
             rightBrother->removeLeaf(i);
             leafParent->insertNonFull(key, comp);
             return ;
@@ -313,6 +312,7 @@ void BTree<T, B, Comparator>::insert(const T& key) {
     int i = 0;
     do {
         i = std::upper_bound(node->keys.begin(), node->keys.end(), key, comp) - node->keys.begin();
+        if(i >= node->children.size()) break;
     } while(!node->children[i]->leaf && (node = node->children[i]));
 
     BTreeNode<T, B, Comparator>* leaf = new BTreeNode<T, B, Comparator>(true);
@@ -321,14 +321,17 @@ void BTree<T, B, Comparator>::insert(const T& key) {
             node->children.begin(),node->children.end(), key,
             typename BTreeNode<T, B, Comparator>::BTreeNodeComparator{comp}
             );
-    node->children.emplace(node->children.begin() + indexBeforeInsert, leaf);
-    //std::sort(node->keys.begin(), node->keys.end(), comp);
 
-    if(node->children.size() - 1 != node->keys.size()){
-        int idx = binarySearch(node->keys.begin(), node->keys.end(), key, comp);
-        node->keys.emplace(node->keys.begin() + idx, key);
+    if(node->children.size() != node->keys.size()){
+        if(indexBeforeInsert == 0){
+            T toInsert = node->children.front()->keys.front();
+            node->keys.emplace(node->keys.begin() + indexBeforeInsert, toInsert);
+        } else {
+            node->keys.emplace(node->keys.begin() + indexBeforeInsert - 1, key);
+        }
     }
 
+    node->children.emplace(node->children.begin() + indexBeforeInsert, leaf);
 
     while (node != root && node->keys.size() > B - 1) {
         BTreeNode<T, B, Comparator>* parent = findParent(root, node);
@@ -439,11 +442,35 @@ int main() {
 
     // Insert keys
     tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
     tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
     tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
     tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
     tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
     tree.insert(25);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
     tree.insert(22);
     tree.insert(4);
 
@@ -455,7 +482,7 @@ int main() {
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
-    tree.remove(4);
+    tree.remove(10);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
