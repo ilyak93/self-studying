@@ -141,9 +141,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
         int rightBrotherIdx = t + 1;
         rightBrother = parent->children[rightBrotherIdx];
     }
-    if((leftBrother && rightBrother &&
-       leftBrother->children.size() > rightBrother->children.size()) ||
-       rightBrother == nullptr) {
+    if(leftBrother && leftBrother->children.size() > B / 2 + 1) {
         int i = 0;
         do {
             i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
@@ -151,7 +149,7 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
         if(leftBrother->children.size() > B / 2 + 1) {
             T key =  leftBrother->children[i]->keys.front();
             leftBrother->removeLeaf(i);
-            leafParent->insertNonFull(key, comp);
+
 
             int parent_idx = std::upper_bound(
                     parent->keys.begin(), parent->keys.end(),
@@ -159,12 +157,18 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
 
             parent->keys[parent_idx] = key;
 
+            Comparator comp;
+            if(comp(leafParent->children.front()->keys.front(), key)){
+                leafParent->keys[0] = key;
+            } else {
+                leafParent->keys[0] = leafParent->children.front()->keys.front();
+            }
+
+            leafParent->insertNonFull(key, comp);
+
             return;
         }
-    } else if ((leftBrother && rightBrother &&
-                leftBrother->children.size() <=
-                rightBrother->children.size()) ||
-                leftBrother == nullptr) {
+    } else if (rightBrother && rightBrother->children.size() > B / 2 + 1) {
         int i = 0;
         do {
             i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
@@ -181,6 +185,8 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
                     key, comp) - parent->keys.begin();
 
             parent->keys[parent_idx] = parentKey;
+
+            leafParent->keys[0] = key;
 
             return ;
         }
@@ -494,11 +500,11 @@ int main() {
     tree.print();
     std::cout << std::endl;
 
-    tree.remove(3);
+    tree.remove(22);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
-    tree.remove(4);
+    tree.remove(25);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
