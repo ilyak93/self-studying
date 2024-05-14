@@ -190,19 +190,37 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
 
             return ;
         }
+    } else {
+        // Merge operation
+        if (leftBrother) {
+            // Merge leafParent with leftBrother
+            leftBrother->keys.insert(leftBrother->keys.end(), leafParent->keys.begin(), leafParent->keys.end());
+            leftBrother->children.insert(leftBrother->children.end(), leafParent->children.begin(), leafParent->children.end());
+
+            int parent_idx = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
+            //parent->keys.erase(parent->keys.begin() + parent_idx - 1);
+            parent->children.erase(parent->children.begin() + parent_idx);
+
+            delete leafParent;
+
+            //parent->fixAfterMerge();
+        } else if (rightBrother) {
+            // Merge leafParent with rightBrother
+            leafParent->keys.insert(leafParent->keys.end(), rightBrother->keys.begin(), rightBrother->keys.end());
+            leafParent->children.insert(leafParent->children.end(), rightBrother->children.begin(), rightBrother->children.end());
+
+            int parent_idx = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
+            parent->keys.erase(parent->keys.begin() + parent_idx);
+            parent->children.erase(parent->children.begin() + parent_idx + 1);
+
+            delete rightBrother;
+
+            //parent->fixAfterMerge();
+        }
+
+        // Recursively remove the key from the merged node
+        remove(parent, key);
     }
-    //BTreeNode<T, B, Comparator>* leftChild = node->children[i];
-    //BTreeNode<T, B, Comparator>* rightChild = node->children[i + 1];
-
-    //T oldKey = node->keys[i];
-    //merge(node, i);
-    //remove(node->children[i], oldKey);
-
-    //bool flag = (i == node->keys.size());
-
-    //BTreeNode<T, B, Comparator>* child = node->children[i];
-    //if (child->keys.size() < B / 2)
-    //    fill(node, i);
 
 }
 
@@ -514,6 +532,7 @@ int main() {
     tree.print();
     std::cout << std::endl;
 
+    /*
     // Print the tree
     std::cout << "B-Tree:" << std::endl;
     tree.print();
@@ -525,6 +544,6 @@ int main() {
         std::cout << "Key " << key << " found in the tree" << std::endl;
     else
         std::cout << "Key " << key << " not found in the tree" << std::endl;
-
+    */
     return 0;
 }
