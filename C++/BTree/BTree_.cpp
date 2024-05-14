@@ -130,15 +130,16 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
     BTreeNode<T, B, Comparator>* leftBrother = nullptr;
     BTreeNode<T, B, Comparator>* rightBrother = nullptr;
 
-
+    int leftBrotherIdx = -1;
+    int rightBrotherIdx = -1;
     if(parent->children[0] != leafParent) {
         int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
-        int leftBrotherIdx = t - 1;
+        leftBrotherIdx = t - 1;
         leftBrother = parent->children[leftBrotherIdx];
     }
     if(parent->children[parent->children.size() - 1] != leafParent) {
         int t = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
-        int rightBrotherIdx = t + 1;
+        rightBrotherIdx = t + 1;
         rightBrother = parent->children[rightBrotherIdx];
     }
     if(leftBrother && leftBrother->children.size() > B / 2 + 1) {
@@ -203,6 +204,9 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
 
             delete leafParent;
 
+            parent->keys.erase(parent->keys.begin() + leftBrotherIdx);
+
+
             //parent->fixAfterMerge();
         } else if (rightBrother) {
             // Merge leafParent with rightBrother
@@ -210,16 +214,15 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
             leafParent->children.insert(leafParent->children.end(), rightBrother->children.begin(), rightBrother->children.end());
 
             int parent_idx = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
-            parent->keys.erase(parent->keys.begin() + parent_idx);
+            //parent->keys.erase(parent->keys.begin() + parent_idx);
             parent->children.erase(parent->children.begin() + parent_idx + 1);
 
             delete rightBrother;
 
+            parent->keys.erase(parent->keys.begin() + rightBrotherIdx - 1);
+
             //parent->fixAfterMerge();
         }
-
-        // Recursively remove the key from the merged node
-        remove(parent, key);
     }
 
 }
@@ -518,16 +521,11 @@ int main() {
     tree.print();
     std::cout << std::endl;
 
-    tree.remove(22);
+    tree.remove(2);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
-    tree.remove(25);
-    std::cout << "B-Tree:" << std::endl;
-    tree.print();
-    std::cout << std::endl;
-
-    tree.remove(14);
+    tree.remove(3);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
