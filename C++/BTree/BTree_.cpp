@@ -100,7 +100,7 @@ void BTree<T, B, Comparator>::remove(const T& key) {
 
     remove(root, key);
 
-    if (root->keys.empty()) {
+    if (root->keys.empty() || root->children.size() == 1) {
         BTreeNode<T, B, Comparator>* oldRoot = root;
         if (root->leaf)
             root = nullptr;
@@ -113,118 +113,143 @@ void BTree<T, B, Comparator>::remove(const T& key) {
 template <typename T, int B, typename Comparator>
 void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& key) {
 
-
     BTreeNode<T, B, Comparator>* node = root;
     int child_idx = -1;
-    BTreeNode<T, B, Comparator>* leafParent = root->getLeafParent(key, child_idx);
+    BTreeNode<T, B, Comparator>* cur_child = root->getLeafParent(key, child_idx);
 
-    leafParent->removeLeaf(child_idx);
+    cur_child->removeLeaf(child_idx);
 
-    if(leafParent->children.size() > B / 2) return;
+    BTreeNode<T, B, Comparator>* parent = findParent(root, cur_child);
 
-    T& smallestKey = leafParent->keys.front();
-    T& biggestKey = leafParent->keys.back();
+    while(parent != nullptr) {
+        if(cur_child->children.size() > B / 2) return;
 
-    BTreeNode<T, B, Comparator>* parent = findParent(root, leafParent);
+        T& smallestKey = cur_child->keys.front();
+        T& biggestKey = cur_child->keys.back();
 
-    BTreeNode<T, B, Comparator>* leftBrother = nullptr;
-    BTreeNode<T, B, Comparator>* rightBrother = nullptr;
+        BTreeNode<T, B, Comparator> *leftBrother = nullptr;
+        BTreeNode<T, B, Comparator> *rightBrother = nullptr;
 
-    int leftBrotherIdx = -1;
-    int rightBrotherIdx = -1;
-    if(parent->children[0] != leafParent) {
-        int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
-        leftBrotherIdx = t - 1;
-        leftBrother = parent->children[leftBrotherIdx];
-    }
-    if(parent->children[parent->children.size() - 1] != leafParent) {
-        int t = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
-        rightBrotherIdx = t + 1;
-        rightBrother = parent->children[rightBrotherIdx];
-    }
-    if(leftBrother && leftBrother->children.size() > B / 2 + 1) {
-        int i = 0;
-        do {
-            i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) - leftBrother->keys.begin();
-        } while(!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
-        if(leftBrother->children.size() > B / 2 + 1) {
-            T key =  leftBrother->children[i]->keys.front();
-            leftBrother->removeLeaf(i);
+        int leftBrotherIdx = -1;
+        int rightBrotherIdx = -1;
+        if (parent->children[0] != cur_child) {
+            int t = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) -
+                    parent->keys.begin();
+            leftBrotherIdx = t - 1;
+            leftBrother = parent->children[leftBrotherIdx];
+        }
+        if (parent->children[parent->children.size() - 1] != cur_child) {
+            int t = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
+            rightBrotherIdx = t + 1;
+            rightBrother = parent->children[rightBrotherIdx];
+        }
+        if (leftBrother && leftBrother->children.size() > B / 2 + 1) {
+            int i = 0;
+            do {
+                i = std::upper_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) -
+                    leftBrother->keys.begin();
+            } while (!leftBrother->children[i]->leaf && (leftBrother = leftBrother->children[i]));
+            if (leftBrother->children.size() > B / 2 + 1) {
+                T key = leftBrother->children[i]->keys.front();
+                leftBrother->removeLeaf(i);
 
 
-            int parent_idx = std::upper_bound(
-                    parent->keys.begin(), parent->keys.end(),
-                    key, comp) - parent->keys.begin();
+                int parent_idx = std::upper_bound(
+                        parent->keys.begin(), parent->keys.end(),
+                        key, comp) - parent->keys.begin();
 
-            parent->keys[parent_idx] = key;
+                parent->keys[parent_idx] = key;
 
-            Comparator comp;
-            if(comp(leafParent->children.front()->keys.front(), key)){
-                leafParent->keys[0] = key;
-            } else {
-                leafParent->keys[0] = leafParent->children.front()->keys.front();
+                Comparator comp;
+                if (comp(cur_child->children.front()->keys.front(), key)) {
+                    cur_child->keys[0] = key;
+                } else {
+                    cur_child->keys[0] = cur_child->children.front()->keys.front();
+                }
+
+                cur_child->insertNonFull(key, comp);
+
+                return;
+            }
+        } else if (rightBrother && rightBrother->children.size() > B / 2 + 1) {
+            int i = 0;
+            do {
+                i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) -
+                    rightBrother->keys.begin();
+            } while (!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
+            if (rightBrother->children.size() > B / 2 + 1) {
+                T key = rightBrother->children[i]->keys.front();
+                T parentKey = rightBrother->children[i + 1]->keys.front();
+
+                rightBrother->removeLeaf(i);
+                cur_child->insertNonFull(key, comp);
+
+                int parent_idx = std::lower_bound(
+                        parent->keys.begin(), parent->keys.end(),
+                        key, comp) - parent->keys.begin();
+
+                parent->keys[parent_idx] = parentKey;
+
+                cur_child->keys[0] = key;
+
+                return;
+            }
+        } else {
+            // Merge operation
+            if (leftBrother) {
+                //int t = std::lower_bound(leftBrother->keys.begin(), leftBrother->keys.end(), key, comp) -
+                //        leftBrother->keys.begin();
+
+                // Merge leafParent with leftBrother
+                leftBrother->keys.insert(leftBrother->keys.end(), cur_child->keys.begin(), cur_child->keys.end());
+                leftBrother->children.insert(leftBrother->children.end(), cur_child->children.begin(),
+                                             cur_child->children.end());
+
+
+
+                int parent_idx = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) -
+                                 parent->keys.begin();
+                //parent->keys.erase(parent->keys.begin() + parent_idx - 1);
+                parent->children.erase(parent->children.begin() + parent_idx);
+
+                delete cur_child;
+
+                //leftBrother->keys[t -1] = parent->keys[leftBrotherIdx];
+
+                if(parent->keys.size() > 1) {
+                    parent->keys.erase(parent->keys.begin() + leftBrotherIdx);
+                }
+
+                //parent->fixAfterMerge();
+            } else if (rightBrother) {
+                int t = std::upper_bound(cur_child->keys.begin(), cur_child->keys.end(), key, comp) -
+                        cur_child->keys.begin();
+
+                // Merge leafParent with rightBrother
+                cur_child->keys.insert(cur_child->keys.end(), rightBrother->keys.begin(), rightBrother->keys.end());
+                cur_child->children.insert(cur_child->children.end(), rightBrother->children.begin(),
+                                            rightBrother->children.end());
+
+                int parent_idx = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) -
+                                 parent->keys.begin();
+                //parent->keys.erase(parent->keys.begin() + parent_idx);
+                parent->children.erase(parent->children.begin() + parent_idx + 1);
+
+                delete rightBrother;
+
+                cur_child->keys[t] = parent->keys[rightBrotherIdx - 1];
+
+                if(parent->keys.size() > 1) {
+                    parent->keys.erase(parent->keys.begin() + rightBrotherIdx - 1);
+                }
+
+                //parent->fixAfterMerge();
             }
 
-            leafParent->insertNonFull(key, comp);
-
-            return;
         }
-    } else if (rightBrother && rightBrother->children.size() > B / 2 + 1) {
-        int i = 0;
-        do {
-            i = std::lower_bound(rightBrother->keys.begin(), rightBrother->keys.end(), key, comp) - rightBrother->keys.begin();
-        } while(!rightBrother->children[i]->leaf && (rightBrother = rightBrother->children[i]));
-        if(rightBrother->children.size() > B / 2 + 1){
-            T key = rightBrother->children[i]->keys.front();
-            T parentKey = rightBrother->children[i+1]->keys.front();
-
-            rightBrother->removeLeaf(i);
-            leafParent->insertNonFull(key, comp);
-
-            int parent_idx = std::lower_bound(
-                    parent->keys.begin(), parent->keys.end(),
-                    key, comp) - parent->keys.begin();
-
-            parent->keys[parent_idx] = parentKey;
-
-            leafParent->keys[0] = key;
-
-            return ;
-        }
-    } else {
-        // Merge operation
-        if (leftBrother) {
-            // Merge leafParent with leftBrother
-            leftBrother->keys.insert(leftBrother->keys.end(), leafParent->keys.begin(), leafParent->keys.end());
-            leftBrother->children.insert(leftBrother->children.end(), leafParent->children.begin(), leafParent->children.end());
-
-            int parent_idx = std::lower_bound(parent->keys.begin(), parent->keys.end(), smallestKey, comp) - parent->keys.begin();
-            //parent->keys.erase(parent->keys.begin() + parent_idx - 1);
-            parent->children.erase(parent->children.begin() + parent_idx);
-
-            delete leafParent;
-
-            parent->keys.erase(parent->keys.begin() + leftBrotherIdx);
-
-
-            //parent->fixAfterMerge();
-        } else if (rightBrother) {
-            // Merge leafParent with rightBrother
-            leafParent->keys.insert(leafParent->keys.end(), rightBrother->keys.begin(), rightBrother->keys.end());
-            leafParent->children.insert(leafParent->children.end(), rightBrother->children.begin(), rightBrother->children.end());
-
-            int parent_idx = std::upper_bound(parent->keys.begin(), parent->keys.end(), biggestKey, comp) - parent->keys.begin();
-            //parent->keys.erase(parent->keys.begin() + parent_idx);
-            parent->children.erase(parent->children.begin() + parent_idx + 1);
-
-            delete rightBrother;
-
-            parent->keys.erase(parent->keys.begin() + rightBrotherIdx - 1);
-
-            //parent->fixAfterMerge();
-        }
+        cur_child = parent;
+        parent = findParent(root, parent);
     }
-
 }
 
 template <typename T, int B, typename Comparator>
@@ -480,7 +505,7 @@ void BTree<T, B, Comparator>::print() {
         std::cout << "Empty tree" << std::endl;
 }
 
-int main() {
+int test_remove_merge_4_levels(){
     BTree<int, 3> tree;
 
     // Insert keys
@@ -506,29 +531,323 @@ int main() {
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
     tree.insert(14);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
-    tree.insert(25);
-    std::cout << "B-Tree:" << std::endl;
-    tree.print();
-    std::cout << std::endl;
-    tree.insert(22);
-    tree.insert(4);
+    tree.insert(15);
+    tree.insert(16);
+    tree.insert(19);
 
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
 
-    tree.remove(2);
-    std::cout << "B-Tree:" << std::endl;
-    tree.print();
-    std::cout << std::endl;
     tree.remove(3);
     std::cout << "B-Tree:" << std::endl;
     tree.print();
     std::cout << std::endl;
+}
+
+int test_remove_merge_4_levels_right(){
+    BTree<int, 3> tree;
+
+    // Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(15);
+    tree.insert(16);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+}
+
+int test_remove_merge_4_levels_right22(){
+    BTree<int, 3> tree;
+
+    // Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(15);
+    tree.insert(16);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+}
+
+int test_remove_merge_4_levels_right222(){
+    BTree<int, 3> tree;
+
+    // Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(15);
+    tree.insert(16);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(15);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+}
+
+int test_remove_merge_4_levels_right2222(){
+    BTree<int, 3> tree;
+
+    // Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(15);
+    tree.insert(16);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(16);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+}
+
+int test_remove_merge_4_levels_right2(){
+    BTree<int, 3> tree;
+
+    // Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(15);
+    tree.insert(16);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+}
+
+int test_remove_merge_3_levels(){
+    BTree<int, 3> tree;
+
+    //Insert keys
+    tree.insert(3);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(2);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(1);
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.insert(10);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+    tree.insert(14);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    tree.remove(7);
+    std::cout << "B-Tree:" << std::endl;
+    tree.print();
+    std::cout << std::endl;
+
+    return 0;
+}
+
+int main() {
+    test_remove_merge_4_levels_right2222();
+
+    //tree.remove(3);
+    //std::cout << "B-Tree:" << std::endl;
+    //tree.print();
+    //std::cout << std::endl;
 
     /*
     // Print the tree
