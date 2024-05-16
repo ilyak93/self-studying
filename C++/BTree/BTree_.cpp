@@ -225,6 +225,8 @@ void BTree<T, B, Comparator>::remove(BTreeNode<T, B, Comparator>* r, const T& ke
                 int t = std::upper_bound(cur_child->keys.begin(), cur_child->keys.end(), key, comp) -
                         cur_child->keys.begin();
 
+                t = t - 1 < 0 ? t : t - 1;
+
                 // Merge leafParent with rightBrother
                 cur_child->keys.insert(cur_child->keys.end(), rightBrother->keys.begin(), rightBrother->keys.end());
                 cur_child->children.insert(cur_child->children.end(), rightBrother->children.begin(),
@@ -842,7 +844,8 @@ int test_remove_merge_3_levels(){
 }
 
 int main() {
-    test_remove_merge_4_levels_right222();
+    test_remove_merge_4_levels_right2222();
+
 
     //tree.remove(3);
     //std::cout << "B-Tree:" << std::endl;
