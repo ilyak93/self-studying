@@ -10,7 +10,8 @@ using namespace std;
 
 int GetTagEndIndex(string line){
     int index = 0;
-    while(line[index] != ' ') index++;
+    while(line[index] != ' ' && index < int(line.size())) index++;
+    if(index == int(line.size())) index--;
     return index - 1;
 }
 
@@ -24,7 +25,7 @@ void GetEqualPosEndPos(string& line, const int start, int& equal, int& end){
             break;
         }
     }
-    while(line[equal] == '=' || line[equal] == ' ') equal--;
+    while((line[equal] == '=' || line[equal] == ' ') && equal > 0) equal--;
 }
 
 int main() {
@@ -34,14 +35,23 @@ int main() {
 
     map<string, string> attributeMap;
     string currentTag;
-
+    string tag;
+    bool first = true;
     for (int i = 0; i < n; i++) {
         string line;
         getline(cin, line);
 
-        if(line[0] == '<'){
+        if(line[0] == '<' && line[1] != '/') {
             int curTagEndIndex = GetTagEndIndex(line);
             string tagName = line.substr(1, curTagEndIndex);
+
+            if(first) {
+                tag += tagName;
+            } else {
+                tag += ".";
+                tag += tagName;
+            }
+
             int end = -1;
             int size = line.size();
             while(end < size - 1) {
@@ -49,19 +59,23 @@ int main() {
                 int curEnd = -1;
                 int curEqualPos = -1;
                 GetEqualPosEndPos(line, curStart, curEqualPos, curEnd);
+                if(curEnd == -1) break;
                 string valueName = line.substr(curStart, curEqualPos - curStart + 1);
-                end = curEnd + 2;
                 int valueStartPos = curEnd - 1;
                 while (line[valueStartPos] != '"') valueStartPos--;
                 valueStartPos++;
                 string value = line.substr(valueStartPos, curEnd - valueStartPos + 1);
-
-                attributeMap[valueName] = value;
-
+                attributeMap[tag + "~" + valueName] = value;
+                end = curEnd + 2;
                 curTagEndIndex = end - 2 + 1;
             }
+            first = false;
+        } else if(line[0] == '<' && line[1] == '/'){
+            int t = tag.size() - 1;
+            while(tag[t] != '.' && t > 0) t--;
+            tag = tag.substr(0, t);
+            if(tag == "") first = true;
         }
-
 
 
     }
@@ -79,3 +93,5 @@ int main() {
 
     return 0;
 }
+
+
