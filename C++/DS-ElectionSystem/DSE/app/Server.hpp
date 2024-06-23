@@ -7,48 +7,55 @@
 #include <future>
 #include <atomic>
 #include <memory>
-#include<set>
+#include <set>
 #include <grpcpp/grpcpp.h>
-//#include "zk_manager.h"
-//#include "greeting_server.h"
-//#include "greeting_paxos_server.h"
-//#include "greeting_client.h"
-//#include "votes_map.h"
-//#include "read_states.h"
-//#include "read_voters.h"
+#include "zk/ZkManager.hpp"
+#include "controllers/VotesMap.hpp"
+#include "models/Vote.hpp"
+#include "utils/ReadStates.hpp"
+#include "utils/ReadVoters.hpp"
+
+class GreetingServer;
+class GreetingClient;
+class GreetingPaxosServer;
+class ZkManager;
+
+class KeeperException;
+class InterruptedException;
 
 class Server {
+private:    
+    static void initialize(const std::vector<std::string>& argv);
 public:
-    Server(const std::vector<std::string>& argv);
-    void run();
+    static std::unique_ptr<GreetingServer> grpcServer;
+    static std::unique_ptr<GreetingClient> grpcClient;
+    static std::unique_ptr<GreetingPaxosServer> grpcPaxosServer;
+    static std::unique_ptr<ZkManager> zkManager;
+    static int serverId;
+    static std::atomic<int> votesCounter;
+    static std::map<int, std::future<Vote>> votesInDistributionProcess;
+    static std::atomic<bool> electionsStarted;
+    static std::atomic<bool> electionsEnded;
+    static std::atomic<bool> finishedAll;
+    static std::atomic<int> sendingRemoteVoteCounter;
+    static std::atomic<int> sendingRemoteVoteMutex;
+    static std::atomic<bool> receiveNewVotes;
+    static std::string state;
+    static std::map<std::string, int> stateToElectors;
+    static std::map<int, std::string> clientIdToOriginState;
+    static std::atomic<bool> choseWinner;
+    static std::string winner;
+    static std::set<std::string> allStates;
 
-private:
-    std::unique_ptr<GreetingServer> initializeGrpcServer(int id, int port, const std::string& state);
-    std::unique_ptr<GreetingPaxosServer> initializeGreetingPaxosServer(int id, int port);
-    void processFutureVotes();
-    void pollElectionsStart();
-    void broadcastAllVotesInState();
-    std::string getWinner();
+    Server::Server(const std::vector<std::string>& argv);
+    static void run();
 
-    std::unique_ptr<GreetingServer> grpcServer;
-    std::unique_ptr<GreetingClient> grpcClient;
-    std::unique_ptr<GreetingPaxosServer> grpcPaxosServer;
-    std::unique_ptr<ZkManager> zkManager;
-    int serverId;
-    std::atomic<int> votesCounter{0};
-    std::map<int, std::future<Vote>> votesInDistributionProcess;
-    std::atomic<bool> electionsStarted{false};
-    std::atomic<bool> electionsEnded{false};
-    std::atomic<bool> finishedAll{false};
-    std::atomic<int> sendingRemoteVoteCounter{0};
-    std::atomic<int> sendingRemoteVoteMutex{-1};
-    std::atomic<bool> receiveNewVotes{true};
-    std::string state;
-    std::map<std::string, int> stateToElectors;
-    std::map<int, std::string> clientIdToOriginState;
-    std::atomic<bool> choseWinner{false};
-    std::string winner;
-    std::set<std::string> allStates;
+    static std::unique_ptr<GreetingServer> initializeGrpcServer(int id, int port, const std::string& state);
+    static std::unique_ptr<GreetingPaxosServer> initializeGreetingPaxosServer(int id, int port);
+    static void processFutureVotes();
+    static void pollElectionsStart();
+    static void broadcastAllVotesInState();
+    static std::string getWinner();
 };
 
 #endif // SERVER_H
