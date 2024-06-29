@@ -9,12 +9,10 @@ private:
     int electors;
 
 public:
-    // Constructor
-    Distribution(const std::string& party, int electors);
+    Distribution(const std::string& party, int electors) : party(party), electors(electors) {}
 
-    // Getters
-    std::string getParty() const;
-    int getElectors() const;
+    std::string getParty() const { return party; }
+    int getElectors() const { return electors; }
 };
 
 #endif // DISTRIBUTION_HPP
