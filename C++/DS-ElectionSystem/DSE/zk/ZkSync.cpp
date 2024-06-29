@@ -15,6 +15,7 @@ ZkSync::ZkSync(const std::string& address) {
             std::cout << e.what() << std::endl;
             zk = nullptr;
         }
+        throw ;
     }
 }
 
@@ -31,9 +32,22 @@ void ZkSync::watcher(zhandle_t* zh, int type, int state, const char* path, void*
         } else if (state == ZOO_EXPIRED_SESSION_STATE) {
             std::cout << "ZooKeeper session expired" << std::endl;
         }
+    } else if (type == ZOO_CREATED_EVENT) {
+            std::cout << "Node created: " << path << std::endl;
+    } else if (type == ZOO_DELETED_EVENT) {
+        std::cout << "Node deleted: " << path << std::endl;
+    } else if (type == ZOO_CHANGED_EVENT) {
+            std::cout << "Node changed: " << path << std::endl;
+    } else if (type == ZOO_CHILD_EVENT) {
+            std::cout << "Child changed: " << path << std::endl;
     }
 
     ZkSync* zkSync = static_cast<ZkSync*>(watcherCtx);
     std::unique_lock<std::mutex> lock(zkSync->mutex);
     zkSync->cv.notify_one();
+}
+
+void ZkSync::wait() {
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock);
 }
