@@ -6,6 +6,7 @@
 #include <ctime>
 #include <iostream>
 
+
 class Vote {
 private:
     int clientId;

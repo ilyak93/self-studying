@@ -1,4 +1,5 @@
 #include "Vote.hpp"
+#include"Server.hpp"
 
 // Constructor with clientId and party
 Vote::Vote(int clientId, const std::string& party) 
