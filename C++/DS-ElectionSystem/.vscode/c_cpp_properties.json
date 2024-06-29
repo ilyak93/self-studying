@@ -1,0 +1,46 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/DSE_env/zookeeper/zookeeper-client/zookeeper-client-c/include",
+                "C:/DSE_env/zookeeper/zookeeper-client/zookeeper-client-c/generated",
+                "C:/Crow/include",
+                "C:/asio-1.30.2/include",
+                "C:/jsoncpp/include",
+                "${workspaceFolder}/DSE/protos",
+                "C:/grpc/include",
+                "${workspaceFolder}/DSE/app/models",
+                "${workspaceFolder}/DSE/app",
+                "${workspaceFolder}/DSE/gRPCObjects/interceptors",
+                "${workspaceFolder}/DSE/app/paxos"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.17763.0",
+            "cStandard": "c99",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "windows-msvc-x64"
+        },
+        {
+            "name": "DSE",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.17763.0",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}
