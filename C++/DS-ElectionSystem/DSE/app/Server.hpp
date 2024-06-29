@@ -11,17 +11,39 @@
 #include <grpcpp/grpcpp.h>
 #include "zk/ZkManager.hpp"
 #include "controllers/VotesMap.hpp"
-#include "models/Vote.hpp"
+#include "Vote.hpp"
 #include "utils/ReadStates.hpp"
 #include "utils/ReadVoters.hpp"
+#include <exception>
+#include <string>
 
 class GreetingServer;
 class GreetingClient;
 class GreetingPaxosServer;
-class ZkManager;
 
-class KeeperException;
-class InterruptedException;
+class KeeperException : public std::exception {
+private:
+    std::string message;
+
+public:
+    explicit KeeperException(const std::string& msg) : message(msg) {}
+
+    const char* what() const noexcept override {
+        return message.c_str();
+    }
+};
+
+class InterruptedException : public std::exception {
+private:
+    std::string message;
+
+public:
+    explicit InterruptedException(const std::string& msg) : message(msg) {}
+
+    const char* what() const noexcept override {
+        return message.c_str();
+    }
+};
 
 class Server {
 private:    

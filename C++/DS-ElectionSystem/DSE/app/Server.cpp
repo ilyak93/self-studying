@@ -1,7 +1,31 @@
 #include "Server.hpp"
 #include <iostream>
 
-Server::Server(const std::vector<std::string>& argv) {
+#include "Server.hpp"
+#include <iostream>
+
+// Initialize static members
+std::unique_ptr<GreetingServer> Server::grpcServer;
+std::unique_ptr<GreetingClient> Server::grpcClient;
+std::unique_ptr<GreetingPaxosServer> Server::grpcPaxosServer;
+std::unique_ptr<ZkManager> Server::zkManager;
+int Server::serverId = 0;
+std::atomic<int> Server::votesCounter(0);
+std::map<int, std::future<Vote>> Server::votesInDistributionProcess;
+std::atomic<bool> Server::electionsStarted(false);
+std::atomic<bool> Server::electionsEnded(false);
+std::atomic<bool> Server::finishedAll(false);
+std::atomic<int> Server::sendingRemoteVoteCounter(0);
+std::atomic<int> Server::sendingRemoteVoteMutex(-1);
+std::atomic<bool> Server::receiveNewVotes(true);
+std::string Server::state;
+std::map<std::string, int> Server::stateToElectors;
+std::map<int, std::string> Server::clientIdToOriginState;
+std::atomic<bool> Server::choseWinner(false);
+std::string Server::winner;
+std::set<std::string> Server::allStates;
+
+void Server::initialize(const std::vector<std::string>& argv) {
     electionsStarted = false;
     std::string restServerPort = argv[0];
     int grpcServerPort = std::stoi(argv[1]);
@@ -23,6 +47,11 @@ Server::Server(const std::vector<std::string>& argv) {
 
     // Initialize gRPC Paxos server
     grpcPaxosServer = initializeGreetingPaxosServer(serverId, grpcPaxosServerPort);
+}
+
+
+Server::Server(const std::vector<std::string>& argv) {
+    initialize(argv);
 }
 
 void Server::run() {
@@ -82,7 +111,7 @@ void Server::broadcastAllVotesInState() {
         // Handle InterruptedException
     }
 
-    std::vector<Vote> broadcastVotes = VotesMap::copyAll();
+    std::vector<std::shared_ptr<Vote>> broadcastVotes = VotesMap::copyAll();
     int grpcId = 0;
     std::map<int, std::unique_ptr<GreetingClient>> grpcClients;
 
