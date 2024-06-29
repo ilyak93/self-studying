@@ -1,16 +1,16 @@
-#ifndef ZKCONNECTOR_HPP
-#define ZKCONNECTOR_HPP
+#ifndef ZK_CONNECTOR_HPP
+#define ZK_CONNECTOR_HPP
 
 #include <zookeeper.h>
 #include <string>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
 
 class ZkConnector {
 private:
     zhandle_t* zookeeper;
-    std::mutex connectedMutex;
-    std::condition_variable connectedCondition;
+    std::condition_variable connectedSignal;
+    std::mutex mutex;
     bool connected;
 
     static void watcher(zhandle_t* zh, int type, int state, const char* path, void* watcherCtx);
@@ -24,4 +24,4 @@ public:
     zhandle_t* getZooKeeper();
 };
 
-#endif // ZKCONNECTOR_HPP
+#endif // ZK_CONNECTOR_HPP
