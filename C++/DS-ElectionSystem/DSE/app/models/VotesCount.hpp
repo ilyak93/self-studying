@@ -2,7 +2,7 @@
 #define VOTESCOUNT_HPP
 
 #include <string>
-#include <Server.hpp>
+#include "Server.hpp"
 
 class VotesCount {
 private:
