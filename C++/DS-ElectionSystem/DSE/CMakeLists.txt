@@ -5,7 +5,6 @@ add_library(DSE
     app/controllers/VotesMap.cpp
     app/models/CommandElections.cpp
     app/models/ControllerMessage.cpp
-    app/models/Distribution.cpp
     app/models/Vote.cpp
     app/models/VotesCount.cpp
     app/models/VotesCountKey.cpp
@@ -15,8 +14,6 @@ add_library(DSE
     controllers/VotesMap.cpp
     gRPCObjects/interceptors/ClientInterceptor.cpp
     gRPCObjects/interceptors/ServerInterceptor.cpp
-    models/ControllerMessage.cpp
-    models/Vote.cpp
     protos/Paxos.grpc.pb.cc
     protos/Paxos.pb.cc
     protos/Vote.grpc.pb.cc
@@ -26,13 +23,14 @@ add_library(DSE
     zk/ZkSync.cpp
 )
 
+
 # Include directories
 target_include_directories(DSE PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/app
     ${CMAKE_CURRENT_SOURCE_DIR}/controllers
     ${CMAKE_CURRENT_SOURCE_DIR}/gRPCObjects
-    ${CMAKE_CURRENT_SOURCE_DIR}/models
+    ${CMAKE_CURRENT_SOURCE_DIR}/app/models
     ${CMAKE_CURRENT_SOURCE_DIR}/protos
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/zk
@@ -42,8 +40,20 @@ target_include_directories(DSE PUBLIC
     "C:/grpc/include"
 )
 
+# Option for threaded/non-threaded version
+option(USE_THREADED "Use threaded version of ZooKeeper" ON)
+
+# Set compile definitions based on USE_THREADED option
+if(USE_THREADED)
+    target_compile_definitions(DSE PUBLIC THREADED)
+endif()
+
+# Set ZooKeeper library path
+set(ZOOKEEPER_LIB "C:/ZooKeeperC/apache-zookeeper-3.9.2/zookeeper-client/zookeeper-client-c/Debug/zookeeper.lib")
+
+
 # Link libraries
-target_link_libraries(DSE PUBLIC 
+target_link_libraries(DSE PUBLIC
     "C:/ZooKeeperC/apache-zookeeper-3.9.2/zookeeper-client/zookeeper-client-c/Debug/zookeeper.lib"
     ${GRPC_LIBRARIES}
     "C:/grpc/lib/libprotobuf.lib"
