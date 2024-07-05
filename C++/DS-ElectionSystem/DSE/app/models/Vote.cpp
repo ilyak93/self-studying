@@ -1,6 +1,8 @@
 #include "Vote.hpp"
 #include"Server.hpp"
 
+Vote::Vote() : clientId(-1), party(""), counted(false), broadcastedInState(false), serverId(-1){}; 
+
 // Constructor with clientId and party
 Vote::Vote(int clientId, const std::string& party) 
     : clientId(clientId), party(party), counted(false), broadcastedInState(false), serverId(Server::serverId) {

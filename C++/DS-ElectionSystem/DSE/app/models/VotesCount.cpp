@@ -1,5 +1,10 @@
 
 #include "VotesCount.hpp"
+#include <Server.hpp>
+
+//empty Constructor
+VotesCount::VotesCount()
+    : party(""), count(-1), state("") {}
 
 // Constructor with party
 VotesCount::VotesCount(const std::string& party)

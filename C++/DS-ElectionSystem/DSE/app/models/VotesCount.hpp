@@ -2,7 +2,6 @@
 #define VOTESCOUNT_HPP
 
 #include <string>
-#include "Server.hpp"
 
 class VotesCount {
 private:
@@ -12,6 +11,7 @@ private:
 
 public:
     // Constructors
+    VotesCount();
     VotesCount(const std::string& party);
     VotesCount(const std::string& party, int count);
     VotesCount(const std::string& party, int count, const std::string& state);
