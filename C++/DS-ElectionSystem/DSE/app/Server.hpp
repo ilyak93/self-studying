@@ -14,12 +14,11 @@
 #include "Vote.hpp"
 #include "utils/ReadStates.hpp"
 #include "utils/ReadVoters.hpp"
+#include "gRPCObjects/GreetingClient.hpp"
+#include  "gRPCObjects/GreetingServer.hpp"
+#include "gRPCObjects/paxos/GreetingPaxosServer.hpp"
 #include <exception>
 #include <string>
-
-class GreetingServer;
-class GreetingClient;
-class GreetingPaxosServer;
 
 class KeeperException : public std::exception {
 private:
@@ -60,10 +59,10 @@ public:
     static std::atomic<bool> electionsEnded;
     static std::atomic<bool> finishedAll;
     static std::atomic<int> sendingRemoteVoteCounter;
-    static std::atomic<int> sendingRemoteVoteMutex;
+    static std::mutex sendingRemoteVoteMutex;
     static std::atomic<bool> receiveNewVotes;
     static std::string state;
-    static std::map<std::string, int> stateToElectors;
+    static std::unordered_map<std::string, int> stateToElectors;
     static std::map<int, std::string> clientIdToOriginState;
     static std::atomic<bool> choseWinner;
     static std::string winner;
