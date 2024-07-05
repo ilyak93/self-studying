@@ -56,7 +56,9 @@ bool GreetingClient::isAllFutureSendsDone() {
     return true;
 }
 
-std::vector<std::future<protos::VoteReply>> GreetingClient::sendVoteFuture(const Vote& vote) {
+
+
+std::vector<std::shared_future<protos::VoteReply>> GreetingClient::sendVoteFuture(const Vote& vote) {
     protos::VoteRequest request;
     request.set_clientid(vote.getClientId());
     request.set_party(vote.getParty());
@@ -64,23 +66,31 @@ std::vector<std::future<protos::VoteReply>> GreetingClient::sendVoteFuture(const
     request.set_currentstate(vote.getCurrentState());
     request.set_timestamp(vote.getTimeStamp());
 
-    std::vector<std::future<protos::VoteReply>> sendingsInProcess;
+    std::vector<std::shared_future<protos::VoteReply>> sendingsInProcess;
+
     for (auto& channel : channels) {
         auto stub = createStub(channel);
-        grpc::ClientContext context;
-        std::promise<protos::VoteReply> promise;
-        auto future = promise.get_future();
-        stub->async()->ReceiveVote(&context, &request, &promise.get_future().get(), 
-            [&promise](grpc::Status status) {
+        auto promise = std::make_shared<std::promise<protos::VoteReply>>();
+        std::shared_future<protos::VoteReply> shared_future = promise->get_future().share();
+        
+        auto response = new protos::VoteReply();
+        auto context = new grpc::ClientContext();
+
+        stub->async()->ReceiveVote(context, &request, response, 
+            [promise, response, context](grpc::Status status) mutable {
                 if (status.ok()) {
-                    promise.set_value(promise.get_future().get());
+                    promise->set_value(*response);
                 } else {
-                    promise.set_exception(std::make_exception_ptr(std::runtime_error(status.error_message())));
+                    promise->set_exception(std::make_exception_ptr(std::runtime_error(status.error_message())));
                 }
+                delete response;
+                delete context;
             });
-        sendingsInProcess.push_back(std::move(future));
+        
+        sendingsInProcess.push_back(shared_future);
     }
-    sendsInProcess = std::move(sendingsInProcess);
+    
+    sendsInProcess = sendingsInProcess;
     return sendsInProcess;
 }
 
@@ -181,8 +191,8 @@ void GreetingClient::endElections() {
     }
 }
 
-std::unordered_map<VotesCountKey, VotesCount> GreetingClient::getAllVotesCounts() {
-    std::unordered_map<VotesCountKey, VotesCount> allVotesCounts;
+std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>> GreetingClient::getAllVotesCounts() {
+    std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>> allVotesCounts;
     protos::VotesCountForPartyRequest request;
 
     for (auto& channel : channels) {
@@ -197,14 +207,14 @@ std::unordered_map<VotesCountKey, VotesCount> GreetingClient::getAllVotesCounts(
             int count = reply.votescount();
             std::string state = reply.state();
             
-            VotesCount votesCount(party, count, state);
+            auto votesCount = std::make_shared<VotesCount>(VotesCount(party, count, state));
             VotesCountKey key(party, state);
 
             auto it = allVotesCounts.find(key);
             if (it == allVotesCounts.end()) {
                 allVotesCounts[key] = votesCount;
             } else {
-                it->second.add(count);
+                it->second->add(count);
             }
         }
 
