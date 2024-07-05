@@ -16,10 +16,10 @@ std::atomic<bool> Server::electionsStarted(false);
 std::atomic<bool> Server::electionsEnded(false);
 std::atomic<bool> Server::finishedAll(false);
 std::atomic<int> Server::sendingRemoteVoteCounter(0);
-std::atomic<int> Server::sendingRemoteVoteMutex(-1);
+std::mutex Server::sendingRemoteVoteMutex;
 std::atomic<bool> Server::receiveNewVotes(true);
 std::string Server::state;
-std::map<std::string, int> Server::stateToElectors;
+std::unordered_map<std::string, int> Server::stateToElectors;
 std::map<int, std::string> Server::clientIdToOriginState;
 std::atomic<bool> Server::choseWinner(false);
 std::string Server::winner;
@@ -117,7 +117,7 @@ void Server::broadcastAllVotesInState() {
 
     for (const auto& vote : broadcastVotes) {
         auto grpcClient = std::make_unique<GreetingClient>(addressesInState);
-        grpcClient->sendVoteFuture(vote);
+        grpcClient->sendVoteFuture(*vote);
         grpcClients[grpcId] = std::move(grpcClient);
         grpcId++;
     }
@@ -147,7 +147,7 @@ std::string Server::getWinner() {
         return winner;
     }
 
-    std::map<VotesCountKey, VotesCount> allVotesCountsMap;
+    std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>> allVotesCountsMap;
 
     try {
         auto grpcDistribution = std::make_unique<GreetingClient>(zkManager->getAddressInEachState());

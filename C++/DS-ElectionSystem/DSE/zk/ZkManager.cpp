@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <zookeeper.h>
 
+
 ZkManager::ZkManager(const std::string& address, int port, const std::string& state, int serverIndex,
                      const std::string& localhost, int grpcPaxosServerPort, int grpcServerPort)
     : ZkSync(address), serverIndex(serverIndex), state(state) {

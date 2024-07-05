@@ -17,7 +17,14 @@ public:
         return std::to_string(this->sessionId) + "," + std::to_string(this->leaderId);
     }
 
-    size_t hash() const {
-        return std::hash<int>{}(sessionId) ^ (std::hash<int>{}(leaderId) << 1);
-    }
+    // Getter methods for hashing
+    int getSessionId() const { return sessionId; }
+    int getLeaderId() const { return leaderId; }
+
+    // Nested Hash struct
+    struct Hash {
+        std::size_t operator()(const SessionKey& key) const {
+            return std::hash<int>{}(key.getSessionId()) ^ (std::hash<int>{}(key.getLeaderId()) << 1);
+        }
+    };
 };

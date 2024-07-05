@@ -64,7 +64,10 @@ std::unordered_map<std::string, std::shared_ptr<VotesCount>> VotesMap::countVote
     return votesCounts;
 }
 
-std::vector<Distribution> VotesMap::getDistribution(const std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>>& allVotesCounts, const std::unordered_map<std::string, int>& stateToElectors) {
+std::vector<Distribution> VotesMap::getDistribution(
+    const std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>>& allVotesCounts,
+    const std::unordered_map<std::string, int>& stateToElectors) {
+    
     std::unordered_map<std::string, std::unordered_map<std::string, int>> stateKeyToPartyAndVotesMap;
 
     for (const auto& pair : allVotesCounts) {

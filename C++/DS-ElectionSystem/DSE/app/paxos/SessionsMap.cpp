@@ -1,17 +1,5 @@
 #include "SessionsMap.hpp"
 
-// Implementation for SessionKey
-SessionKey::SessionKey(int sessionId, int leaderId)
-    : sessionId(sessionId), leaderId(leaderId) {}
-
-bool SessionKey::operator==(const SessionKey& other) const {
-    return sessionId == other.sessionId && leaderId == other.leaderId;
-}
-
-std::size_t SessionKey::Hash::operator()(const SessionKey& key) const {
-    return std::hash<int>()(key.sessionId) ^ std::hash<int>()(key.leaderId);
-}
-
 // Static member definitions
 std::unordered_map<SessionKey, protos::Session, SessionKey::Hash> SessionsMap::sessionsMap;
 std::mutex SessionsMap::mapMutex;
