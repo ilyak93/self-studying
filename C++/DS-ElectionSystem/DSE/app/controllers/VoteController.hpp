@@ -6,6 +6,10 @@
 #include <string>
 #include <CommandElections.hpp>
 #include "json/json.h"
+#include <VotesCountKey.hpp>
+#include <Vote.hpp>
+#include <VotesCount.hpp>
+#include <Distribution.hpp>
 
 
 class VoteController {
@@ -24,7 +28,8 @@ public:
 
 private:
     std::string jsonify(const std::vector<std::shared_ptr<Vote>>& votes);
-    std::string jsonify(const std::unordered_map<std::string, std::shared_ptr<VotesCount>>& votesCounts);
+    std::string jsonify(const std::unordered_map<std::string, std::shared_ptr<VotesCount>>& votesCount);
+    std::string jsonify(const std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>>& votesCounts);
     std::string jsonify(const std::vector<Distribution>& distributions);
 };
 
