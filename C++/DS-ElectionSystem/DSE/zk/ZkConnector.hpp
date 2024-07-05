@@ -1,6 +1,7 @@
 #ifndef ZK_CONNECTOR_HPP
 #define ZK_CONNECTOR_HPP
 
+#define USE_STATIC_LIB
 #include <zookeeper.h>
 #include <string>
 #include <condition_variable>
