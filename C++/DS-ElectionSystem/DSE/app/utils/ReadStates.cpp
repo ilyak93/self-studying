@@ -30,6 +30,6 @@ ReadStates::ReadStates(const std::string& statesFilePath) {
     file.close();
 }
 
-const std::map<std::string, int>& ReadStates::getStatesMap() const {
+const std::unordered_map<std::string, int>& ReadStates::getStatesMap() const {
     return statesMap;
 }
