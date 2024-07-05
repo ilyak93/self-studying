@@ -1,13 +1,14 @@
 #include "GreetingServer.hpp"
 #include "VotesMap.hpp"
 #include "Vote.hpp"
-#include "FuturePaxosGreetingClient.hpp"
+#include "gRPCObjects/paxos/FuturePaxosGreetingClient.hpp"
 #include "gRPCObjects/interceptors/ServerInterceptor.hpp"
 #include "ZKManager.hpp"
 #include <atomic>
 #include <mutex>
 #include <future>
 #include <iostream>
+#include <Server.hpp>
 
 GreetingServer::GreetingServer(int id, int port, const std::string& state) : id(id), state(state) {
     grpc::ServerBuilder builder;
@@ -16,7 +17,7 @@ GreetingServer::GreetingServer(int id, int port, const std::string& state) : id(
     builder.AddChannelArgument(GRPC_ARG_ENABLE_CHANNELZ, 1);
 
     std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> interceptor_creators;
-    interceptor_creators.emplace_back(std::make_unique<ServerInterceptorImpl::Factory>());
+    interceptor_creators.emplace_back(std::make_unique<ServerInterceptorFactory>(interceptorFactory));
     builder.experimental().SetInterceptorCreators(std::move(interceptor_creators));
 
     greetingServer = builder.BuildAndStart();
@@ -30,6 +31,10 @@ void GreetingServer::shutdown() {
     greetingServer->Shutdown();
 }
 
+void GreetingServer::addRestrict(const std::string& client, const std::string& procedure) {
+    interceptorFactory.AddRestrict(client, procedure);
+}
+
 grpc::Status GreetingServer::ReceiveVote(grpc::ServerContext* context, const protos::VoteRequest* request, protos::VoteReply* response) {
     response->set_clientid(request->clientid());
     response->set_party(request->party());
@@ -41,7 +46,7 @@ grpc::Status GreetingServer::ReceiveVote(grpc::ServerContext* context, const pro
     Vote remoteVote(request->clientid(), request->party(), request->originstate(),
                                  request->currentstate(), request->timestamp());
 
-    if (app::Server::electionsEnded.load()) {
+    if (Server::electionsEnded.load()) {
         bool insertedToVotesMap = false;
         while (!insertedToVotesMap) {
             std::lock_guard<std::mutex> lock(VotesMap::mutex);
@@ -49,7 +54,7 @@ grpc::Status GreetingServer::ReceiveVote(grpc::ServerContext* context, const pro
                 auto currentMapVote = VotesMap::get(request->clientid());
                 std::cout << remoteVote.toString() << std::endl;
                 if (!currentMapVote || request->timestamp() >= currentMapVote->getTimeStamp()) {
-                    VotesMap::put(remoteVote.getClientId(), remoteVote);
+                    VotesMap::put(remoteVote.getClientId(), std::make_shared<Vote>(remoteVote));
                 }
                 insertedToVotesMap = true;
             } catch (const std::exception& e) {
@@ -61,12 +66,12 @@ grpc::Status GreetingServer::ReceiveVote(grpc::ServerContext* context, const pro
     if (this->state == request->originstate() && request->currentstate() != request->originstate()) {
         try {
             auto future = FuturePaxosGreetingClient().calculate(
-                app::Server::zkManager->getCurrentStateAddressesForPaxos(),
-                app::Server::serverId,
+                Server::zkManager->getCurrentStateAddressesForPaxos(),
+                Server::serverId,
                 remoteVote
             );
-            int voteNumber = app::Server::votesCounter.fetch_add(1);
-            app::Server::votesInDistributionProcess[voteNumber] = std::move(future);
+            int voteNumber = Server::votesCounter.fetch_add(1);
+            Server::votesInDistributionProcess[voteNumber] = std::move(future);
         } catch (const std::exception& e) {
             std::cerr << "Exception in receiveVote remoteVote: " << e.what() << std::endl;
         }
@@ -75,30 +80,30 @@ grpc::Status GreetingServer::ReceiveVote(grpc::ServerContext* context, const pro
     return grpc::Status::OK;
 }
 
-grpc::Status GreetingServer::receiveStartElections(grpc::ServerContext* context, const protos::StartElectionsRequest* request, protos::StartElectionsReply* response) {
-    app::Server::electionsStarted.store(true);
+grpc::Status GreetingServer::ReceiveStartElections(grpc::ServerContext* context, const protos::StartElectionsRequest* request, protos::StartElectionsReply* response) {
+    Server::electionsStarted.store(true);
     return grpc::Status::OK;
 }
 
-grpc::Status GreetingServer::receiveEndElections(grpc::ServerContext* context, const protos::EndElectionsRequest* request, protos::EndElectionsReply* response) {
-    while (!app::Server::electionsEnded.load()) {
-        std::lock_guard<std::mutex> lock(app::Server::sendingRemoteVoteMutex);
-        if (app::Server::sendingRemoteVoteCounter.load() == 0) {
-            app::Server::electionsStarted.store(true);
-            app::Server::electionsEnded.store(true);
-            app::Server::zkManager->registerFinishedRemoteSending();
+grpc::Status GreetingServer::ReceiveEndElections(grpc::ServerContext* context, const protos::EndElectionsRequest* request, protos::EndElectionsReply* response) {
+    while (!Server::electionsEnded.load()) {
+        std::lock_guard<std::mutex> lock(Server::sendingRemoteVoteMutex);
+        if (Server::sendingRemoteVoteCounter.load() == 0) {
+            Server::electionsStarted.store(true);
+            Server::electionsEnded.store(true);
+            Server::zkManager->registerFinishedRemoteSending();
         }
     }
     return grpc::Status::OK;
 }
 
-grpc::Status GreetingServer::reciveVotesCount(grpc::ServerContext* context, const protos::VotesCountForPartyRequest* request, grpc::ServerWriter<protos::VotesCountForPartyReply>* writer) {
+grpc::Status GreetingServer::ReciveVotesCount(grpc::ServerContext* context, const protos::VotesCountForPartyRequest* request, grpc::ServerWriter<protos::VotesCountForPartyReply>* writer) {
     auto votesCounts = VotesMap::countVotes();
     for (const auto& [party, votesCount] : votesCounts) {
         protos::VotesCountForPartyReply reply;
         reply.set_state(this->state);
-        reply.set_party(votesCount.getParty());
-        reply.set_votescount(votesCount.getCount());
+        reply.set_party(votesCount->getParty());
+        reply.set_votescount(votesCount->getCount());
         if (!writer->Write(reply)) {
             break;
         }
@@ -106,7 +111,7 @@ grpc::Status GreetingServer::reciveVotesCount(grpc::ServerContext* context, cons
     return grpc::Status::OK;
 }
 
-grpc::Status GreetingServer::receiveStatus(grpc::ServerContext* context, const protos::VotesCountForPartyRequest* request, protos::VotesCountForPartyReply* response) {
+grpc::Status GreetingServer::ReceiveStatus(grpc::ServerContext* context, const protos::VotesCountForPartyRequest* request, protos::VotesCountForPartyReply* response) {
     auto votesCounts = VotesMap::countVotes();
     auto it = votesCounts.find(request->party());
     if (it == votesCounts.end()) {
@@ -114,9 +119,9 @@ grpc::Status GreetingServer::receiveStatus(grpc::ServerContext* context, const p
         response->set_state(request->state());
         response->set_votescount(0);
     } else {
-        response->set_party(it->second.getParty());
-        response->set_state(it->second.getState());
-        response->set_votescount(it->second.getCount());
+        response->set_party(it->second->getParty());
+        response->set_state(it->second->getState());
+        response->set_votescount(it->second->getCount());
     }
     return grpc::Status::OK;
 }
