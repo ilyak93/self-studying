@@ -20,7 +20,6 @@ private:
     int serverId;
 
 public:
-    Vote();
     Vote(int clientId, const std::string& party);
     Vote(int clientId, const std::string& party, const std::string& originState, const std::string& currentState);
     Vote(int clientId, const std::string& party, const std::string& originState, const std::string& currentState, long timeStamp);

@@ -2,11 +2,11 @@
 #ifndef PREPARE_AND_PROMISE_HPP
 #define PREPARE_AND_PROMISE_HPP
 
-#include "Paxos.pb.h"
-#include "Vote.hpp"
-#include "PaxosAction.hpp"
 
-class PrepareAndPromise : public app::paxos::PaxosAction {
+#include "Paxos.pb.h"
+#include "app/paxos/PaxosAction.hpp"
+
+class PrepareAndPromise : public PaxosAction {
 private:
     protos::Promise promise;
 

@@ -5,6 +5,9 @@
 
 #include <grpcpp/grpcpp.h>
 #include "Paxos.grpc.pb.h"
+#include "Vote.hpp"
+#include "SessionsMap.hpp"
+#include "VotesMap.hpp"
 #include <atomic>
 
 class GreetingPaxosServer final : public protos::PaxosGreeter::Service {

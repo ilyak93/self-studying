@@ -3,11 +3,10 @@
 #include "GreetingPaxosServer.hpp"
 #include "gRPCObjects/interceptors/ServerInterceptor.hpp"
 #include "PrepareAndPromise.hpp"
+#include "SessionKey.hpp"
 #include "AcceptAndAccepted.hpp"
 #include "InitAndSession.hpp"
 #include <iostream>
-#include <SessionsMap.hpp>
-#include <VotesMap.hpp>
 
 std::atomic<int> GreetingPaxosServer::sessionsCounter(0);
 
@@ -18,14 +17,9 @@ GreetingPaxosServer::GreetingPaxosServer(int id, int port) : id(id) {
     builder.RegisterService(this);
     builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
 
-    // Create and add the interceptor factory
+    // Add the interceptor
     std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> interceptor_creators;
-    auto interceptorFactory = std::make_unique<ServerInterceptorFactory>();
-    
-    // If you need to add restrictions, do it here
-    // interceptorFactory->AddRestrict("client", "procedure");
-
-    interceptor_creators.push_back(std::move(interceptorFactory));
+    interceptor_creators.emplace_back(new ServerInterceptorImpl());
     builder.experimental().SetInterceptorCreators(std::move(interceptor_creators));
 
     greetingServer = builder.BuildAndStart();

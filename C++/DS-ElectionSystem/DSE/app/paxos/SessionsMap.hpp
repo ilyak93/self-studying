@@ -6,7 +6,21 @@
 #include <mutex>
 #include <memory>
 #include "Paxos.pb.h"  // Assuming this includes the definition for protos::Paxos::Session and protos::Paxos::VotePax
-#include "SessionKey.hpp"
+
+class SessionKey {
+public:
+    SessionKey(int sessionId, int leaderId);
+
+    bool operator==(const SessionKey& other) const;
+
+    struct Hash {
+        std::size_t operator()(const SessionKey& key) const;
+    };
+
+private:
+    int sessionId;
+    int leaderId;
+};
 
 class SessionsMap {
 public:

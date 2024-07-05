@@ -15,7 +15,7 @@
 class GreetingPaxosClient {
 private:
     int serverId;
-    std::vector<std::shared_ptr<grpc::Channel>> channels;
+    std::vector<std::unique_ptr<grpc::Channel>> channels;
     std::vector<std::unique_ptr<protos::PaxosGreeter::Stub>> stubs;
 
     OneTimeUseElement<std::future<protos::Init>> sendInit(const protos::Init& init, protos::PaxosGreeter::Stub* stub);

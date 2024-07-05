@@ -10,7 +10,7 @@ private:
 public:
     OneTimeUseElement(T elem) : element(std::move(elem)), used(false) {}
 
-    T& getElement() {
+    T getElement() const {
         return element;
     }
 

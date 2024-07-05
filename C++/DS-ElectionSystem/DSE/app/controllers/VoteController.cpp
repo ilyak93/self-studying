@@ -1,8 +1,6 @@
 #include "VoteController.hpp"
 #include "Server.hpp"
 #include <ControllerMessage.hpp>
-#include "gRPCObjects/paxos/FuturePaxosGreetingClient.hpp"
-#include <gRPCObjects/FutureRemoteGreetingClient.hpp>
 
 
 VoteController::VoteController() {}
@@ -29,10 +27,10 @@ crow::response VoteController::countVotesInState() {
 }
 
 crow::response VoteController::countAllVotes() {
-    std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>> allVotesCounts;
+    std::vector<VotesCount> allVotesCounts;
     try {
-        auto grpcEndElections = GreetingClient(Server::zkManager->getAddressInEachState());
-        allVotesCounts = grpcEndElections.getAllVotesCounts();
+        auto grpcEndElections = GreetingClient(Server::zkManager.getAddressInEachState());
+        allVotesCounts = grpcEndElections.getAllVotesCounts().values();
     } catch (const std::exception& e) {
         std::cerr << "Exception in countAllVotes: " << e.what() << std::endl;
     }
@@ -42,7 +40,7 @@ crow::response VoteController::countAllVotes() {
 crow::response VoteController::getSingleStatePartyStatus(const VotesCountKey& key) {
     VotesCount status;
     try {
-        auto grpcStatus = GreetingClient(Server::zkManager->getAddressInAnotherState(key.getState()));
+        auto grpcStatus = GreetingClient(Server::zkManager.getAddressInAnotherState(key.getState()));
         status = grpcStatus.getStatus(key.getParty(), key.getState());
     } catch (const std::exception& e) {
         std::cerr << "Exception in getSingleStatePartyStatus: " << e.what() << std::endl;
@@ -55,9 +53,9 @@ crow::response VoteController::getSingleStatePartyStatus(const VotesCountKey& ke
 }
 
 crow::response VoteController::getDistribution() {
-    std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>> allVotesCountsMap;
+    std::map<VotesCountKey, VotesCount> allVotesCountsMap;
     try {
-        auto grpcDistribution = GreetingClient(Server::zkManager->getAddressInEachState());
+        auto grpcDistribution = GreetingClient(Server::zkManager.getAddressInEachState());
         allVotesCountsMap = grpcDistribution.getAllVotesCounts();
     } catch (const std::exception& e) {
         std::cerr << "Exception in getDistribution: " << e.what() << std::endl;
@@ -92,27 +90,24 @@ crow::response VoteController::newVote(const Vote& newVote) {
         return crow::response(400, controllerMessage.getMessage());
     }
     if (newVote.getOriginState() != newVote.getCurrentState()) {
-        std::future<Vote> future = FutureRemoteGreetingClient().calculate(newVote);
-        int voteNumber = Server::votesCounter.fetch_add(1);
-        Server::votesInDistributionProcess[voteNumber] = std::move(future);
+        Future<Vote> future = FutureRemoteGreetingClient().calculate(newVote);
+        int voteNumber = Server::votesCounter.addAndGet(1);
+        Server::votesInDistributionProcess[voteNumber] = future;
     } else {
         try {
-            std::future<Vote>future = FuturePaxosGreetingClient().calculate(Server::zkManager->getCurrentStateAddressesForPaxos(), Server::serverId, newVote);
-            int voteNumber = Server::votesCounter.fetch_add(1);
-            Server::votesInDistributionProcess[voteNumber] = std::move(future);
+            Future<Vote> future = FuturePaxosGreetingClient().calculate(Server::zkManager.getCurrentStateAddressesForPaxos(), Server::serverId, newVote);
+            int voteNumber = Server::votesCounter.addAndGet(1);
+            Server::votesInDistributionProcess[voteNumber] = future;
         } catch (const std::exception& e) {
             std::cerr << "Exception in newVote: " << e.what() << std::endl;
         }
     }
-    std::string message = "The Elections system received the vote Successfully\n";
-    message += "clientID: " + std::to_string(newVote.getClientId()) + "\n";
-    message += "party: " + newVote.getParty() + "\n";
-    message += "current state: " + newVote.getCurrentState() + "\n";
-    message += "origin state: " + newVote.getOriginState() + "\n";
-    message += "timestamp: " + std::to_string(newVote.getTimeStamp()) + "\n";
-
-    controllerMessage.setMessage(message);
-
+    controllerMessage.setMessage("The Elections system received the vote Successfully\n" 
+                                 + "clientID: " + std::to_string(newVote.getClientId()) + "\n" 
+                                 + "party: " + newVote.getParty() + "\n"
+                                 + "current state: " + newVote.getCurrentState() + "\n"
+                                 + "origin state: " + newVote.getOriginState() + "\n"
+                                 + "timestamp: " + std::to_string(newVote.getTimeStamp()) + "\n");
     return crow::response(controllerMessage.getMessage());
 }
 
@@ -125,7 +120,7 @@ crow::response VoteController::startElections(const CommandElections& commandEle
         } else if (!Server::electionsStarted && Server::electionsEnded) {
             controllerMessage.setMessage("Elections ended before they started");
         } else {
-            auto grpcStartElections = GreetingClient(Server::zkManager->getAddressesToStartElections());
+            auto grpcStartElections = GreetingClient(Server::zkManager.getAddressesToStartElections());
             grpcStartElections.startElections();
             controllerMessage.setMessage("Started elections");
         }
@@ -133,7 +128,7 @@ crow::response VoteController::startElections(const CommandElections& commandEle
     if (command == "end") {
         if (Server::receiveNewVotes) {
             Server::receiveNewVotes = false;
-            auto grpcEndElections = GreetingClient(Server::zkManager->getAddressesToStartElections());
+            auto grpcEndElections = GreetingClient(Server::zkManager.getAddressesToStartElections());
             grpcEndElections.endElections();
             controllerMessage.setMessage("Ended elections");
         }
@@ -177,24 +172,10 @@ std::string VoteController::jsonify(const std::vector<std::shared_ptr<Vote>>& vo
     return Json::writeString(writer, jsonVotes);
 }
 
-std::string VoteController::jsonify(const std::unordered_map<VotesCountKey, std::shared_ptr<VotesCount>>& votesCounts) {
+std::string VoteController::jsonify(const std::unordered_map<std::string, std::shared_ptr<VotesCount>>& votesCounts) {
     Json::Value jsonVotesCounts;
-    for (const auto& p : votesCounts) {
-        auto votesCountPtr = p.second;
-        Json::Value jsonVotesCount;
-        jsonVotesCount["party"] = votesCountPtr->getParty();
-        jsonVotesCount["count"] = votesCountPtr->getCount();
-        jsonVotesCount["state"] = votesCountPtr->getState();
-        jsonVotesCounts.append(jsonVotesCount);
-    }
-    Json::StreamWriterBuilder writer;
-    return Json::writeString(writer, jsonVotesCounts);
-}
-
-std::string VoteController::jsonify(const std::unordered_map<std::string, std::shared_ptr<VotesCount>>& votesCount) {
-    Json::Value jsonVotesCounts;
-    for (const auto& p : votesCount) {
-        auto votesCountPtr = p.second;
+    for (const auto& pair : votesCounts) {
+        const auto& votesCountPtr = pair.second;
         Json::Value jsonVotesCount;
         jsonVotesCount["party"] = votesCountPtr->getParty();
         jsonVotesCount["count"] = votesCountPtr->getCount();

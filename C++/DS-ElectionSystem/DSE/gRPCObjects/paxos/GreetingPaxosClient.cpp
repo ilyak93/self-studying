@@ -7,7 +7,7 @@ GreetingPaxosClient::GreetingPaxosClient(const std::vector<std::string>& address
     : serverId(serverId) {
     for (const auto& address : addresses) {
         auto channel = grpc::CreateChannel(address, grpc::InsecureChannelCredentials());
-        channels.push_back(channel);
+        channels.push_back(std::make_unique<grpc::Channel>(std::move(channel)));
         stubs.push_back(protos::PaxosGreeter::NewStub(channel));
     }
 }

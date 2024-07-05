@@ -1,9 +1,7 @@
 #ifndef ZK_SYNC_HPP
 #define ZK_SYNC_HPP
 
-#define USE_STATIC_LIB
 #include <zookeeper.h>
-
 #include <string>
 #include <mutex>
 #include <condition_variable>
