@@ -15,10 +15,8 @@ static void* start = memory_pool;
 // Next available block index
 static size_t next_available_block = 0;
 
-// Free block structure (used for both 32-bit and 64-bit systems)
-typedef struct FreeBlock {
-    struct FreeBlock* next;
-} FreeBlock;
+// Pointer to the head of the free list
+static void* free_list_head = NULL;
 
 // Check if the system is 64-bit
 #if UINTPTR_MAX == 0xffffffffffffffff
@@ -27,40 +25,40 @@ typedef struct FreeBlock {
 #define IS_64_BIT 0
 #endif
 
-#if IS_64_BIT
-// 64-bit specific functions
+// Function to get the upper 32 bits of the start pointer
 static unsigned int getPrefix() {
-    return (unsigned int)((uintptr_t)start >> 32);
+#if IS_64_BIT
+    return (unsigned int)((uintptr_t)memory_pool >> 32);
+#else
+    return 0; // Not used in 32-bit systems
+#endif
 }
 
+// Function to store only the lower 32 bits of a pointer in an int array.
 static void storePointer(int* array, void* ptr) {
+#if IS_64_BIT
     *array = (int)((uintptr_t)ptr & 0xFFFFFFFF);
+#else
+    *array = (int)ptr;
+#endif
 }
 
+// Function to restore a full pointer from a stored 32-bit value
 static void* restorePointer(int* array) {
+#if IS_64_BIT
     uint64_t prefix = (uint64_t)getPrefix() << 32;
     uint64_t suffix = (uint64_t)(unsigned int)(*array);
     return (void*)(prefix | suffix);
-}
-
-#define STORE_NEXT(block, next) storePointer((int*)block, next)
-#define GET_NEXT(block) restorePointer((int*)block)
-
 #else
-// 32-bit specific macros
-#define STORE_NEXT(block, next) (((FreeBlock*)block)->next = (FreeBlock*)next)
-#define GET_NEXT(block) (((FreeBlock*)block)->next)
-
+    return (void*)(*array);
 #endif
-
-// Pointer to the head of the free list
-static void* free_list_head = NULL;
+}
 
 // Allocate a 4-byte block
 void* custom_alloc() {
     if (free_list_head != NULL) {
         void* allocated = free_list_head;
-        free_list_head = GET_NEXT(free_list_head);
+        free_list_head = restorePointer((int*)free_list_head);
         return allocated;
     } else if (next_available_block < NUM_BLOCKS) {
         void* new_block = &memory_pool[next_available_block * BLOCK_SIZE];
@@ -75,7 +73,7 @@ void custom_free(void* ptr) {
     if (ptr == NULL) {
         return;
     }
-    STORE_NEXT(ptr, free_list_head);
+    storePointer((int*)ptr, free_list_head);
     free_list_head = ptr;
 }
 
