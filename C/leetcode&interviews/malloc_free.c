@@ -20,6 +20,13 @@ int MEM[MEMSIZE_INT];
 int* start = MEM;
 int* end = &MEM[MEMSIZE_INT];
 
+// Check if the system is 64-bit
+#if UINTPTR_MAX == 0xffffffffffffffff
+#define IS_64_BIT 1
+#else
+#define IS_64_BIT 0
+#endif
+
 
 
 // Reset the memory management pointers
@@ -38,21 +45,33 @@ static void* GetCurEndAdr(){ return (void*)end; }
 // this 32 bits are permanent from the moment MEM is created,
 // because we use only 1GB of memory, so the 32 most significant bits
 // doesnt change.
+// Function to get the upper 32 bits of the start pointer
 static unsigned int getPrefix() {
-    return (unsigned int)((unsigned long long int)start >> 32);
+#if IS_64_BIT
+    return (unsigned int)((unsigned long long int)MEM >> 32);
+#else
+    return 0; // Not used in 32-bit systems
+#endif
 }
 
 // Function to store only the lower 32 bits of a pointer in an int array.
 static void storePointer(int* array, void* ptr) {
+#if IS_64_BIT
     *array = (int)((unsigned long long int)ptr & 0xFFFFFFFF);
+#else
+    *array = (int)ptr;
+#endif
 }
 
-// Function to restore a full 64-bit pointer from a stored 32-bit value,
-// concating the prefix of the most significant 32 bits using logical or.
+// Function to restore a full pointer from a stored 32-bit value
 static void* restorePointer(int* array) {
+#if IS_64_BIT
     uint64_t prefix = (unsigned long long int)getPrefix() << 32;
     uint64_t suffix = (unsigned long long int)(unsigned int)(*array);
     return (void*)(prefix | suffix);
+#else
+    return (void*)(*array);
+#endif
 }
 
 // Memory allocation function
@@ -60,15 +79,13 @@ void* MyMalloc1(){
     //if blocks were freed before
     if(end < &MEM[MEMSIZE_INT]) {
         // Allocate from the free list (second half)
-        void* ptr = restorePointer(end);
-        end++;
+        void* ptr = restorePointer(end++);
         return ptr;
     }
     // else
     if(start < &MEM[MEMSIZE_INT/2]) {
         // Allocate from the first half
-        int *tmp = start;
-        start++;
+        int *tmp = start++;
         return (void*)tmp;
     }
     return NULL; // if no freed blocks and index is greater or even the half - Out of memory
