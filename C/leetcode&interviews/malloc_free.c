@@ -43,15 +43,15 @@ static unsigned int getPrefix() {
 }
 
 // Function to store only the lower 32 bits of a pointer in an int array.
-static void storePointer(int* array, int index, void* ptr) {
-    array[index] = (int)((unsigned long long int)ptr & 0xFFFFFFFF);
+static void storePointer(int* array, void* ptr) {
+    *array = (int)((unsigned long long int)ptr & 0xFFFFFFFF);
 }
 
 // Function to restore a full 64-bit pointer from a stored 32-bit value,
 // concating the prefix of the most significant 32 bits using logical or.
-static void* restorePointer(int* array, int index) {
+static void* restorePointer(int* array) {
     uint64_t prefix = (unsigned long long int)getPrefix() << 32;
-    uint64_t suffix = (unsigned long long int)(unsigned int)array[index];
+    uint64_t suffix = (unsigned long long int)(unsigned int)(*array);
     return (void*)(prefix | suffix);
 }
 
@@ -60,7 +60,7 @@ void* MyMalloc1(){
     //if blocks were freed before
     if(end < &MEM[MEMSIZE_INT]) {
         // Allocate from the free list (second half)
-        void* ptr = restorePointer(end, 0);
+        void* ptr = restorePointer(end);
         end++;
         return ptr;
     }
@@ -89,7 +89,7 @@ void MyFree1(int* ptr){
     }
 
     // Add ptr to the free list by saving the bottom 32 bits
-    storePointer(--end, 0, ptr);
+    storePointer(--end, ptr);
 }
 
 // Test simple allocation and freeing
@@ -100,7 +100,7 @@ int testSimpleAllocFree()
     assert(allocated+1 == GetCurStartAdr());
     MyFree1(allocated);
     assert(end == (int*)GetMEMEndAdr() - 1);
-    void* freedPtr = restorePointer(end, 0);
+    void* freedPtr = restorePointer(end);
     assert(freedPtr == allocated);
     ResetMem();
     return 0;
@@ -173,7 +173,7 @@ int testFullMEMAllocFree() {
     int* start2 = (int*)GetCurStartAdr() - 1;
     int* end2 = (int*)GetCurEndAdr();
     for(int i = 0; i < MEMSIZE_INT / 2; i++) {
-        assert(start2-- == restorePointer(end2++, 0));
+        assert(start2-- == restorePointer(end2++));
     }
     int* curAdr = (int*)GetCurStartAdr();
     int* HalfAdr = &(((int*)GetMEMStartAdr())[MEMSIZE_INT / 2]);
@@ -214,12 +214,12 @@ int testFullMEMAllocFree2() {
     int* start2 = start - 2;
     int* end2 = (int*)GetCurEndAdr();
     for(int i = 0; i < MEMSIZE_INT / 4; i++) {
-        assert(start2 == restorePointer(end2++, 0));
+        assert(start2 == restorePointer(end2++));
         start2 -= 2;
     }
     int* start3 = start - 1 - 2;
     for(int i = 0; i < MEMSIZE_INT / 4; i++) {
-        assert(start3 == restorePointer(end2++, 0));
+        assert(start3 == restorePointer(end2++));
         start3 -= 2;
     }
     free(allocated);
