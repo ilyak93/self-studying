@@ -38,20 +38,20 @@ static void* GetCurEndAdr(){ return (void*)end; }
 // this 32 bits are permanent from the moment MEM is created,
 // because we use only 1GB of memory, so the 32 most significant bits
 // doesnt change.
-static uint32_t getPrefix() {
-    return (uint32_t)((uint64_t)start >> 32);
+static unsigned int getPrefix() {
+    return (unsigned int)((unsigned long long int)start >> 32);
 }
 
 // Function to store only the lower 32 bits of a pointer in an int array.
 static void storePointer(int* array, int index, void* ptr) {
-    array[index] = (int)((uint64_t)ptr & 0xFFFFFFFF);
+    array[index] = (int)((unsigned long long int)ptr & 0xFFFFFFFF);
 }
 
 // Function to restore a full 64-bit pointer from a stored 32-bit value,
 // concating the prefix of the most significant 32 bits using logical or.
 static void* restorePointer(int* array, int index) {
-    uint64_t prefix = (uint64_t)getPrefix() << 32;
-    uint64_t suffix = (uint64_t)(uint32_t)array[index];
+    uint64_t prefix = (unsigned long long int)getPrefix() << 32;
+    uint64_t suffix = (unsigned long long int)(unsigned int)array[index];
     return (void*)(prefix | suffix);
 }
 
