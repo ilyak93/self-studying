@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <assert.h>
 
 #define MEMORY_SIZE (1ULL * 1024 * 1024 * 1024) // 1GB
 #define BLOCK_SIZE 4 // 4 bytes per block
@@ -10,10 +11,11 @@
 static uint8_t memory_pool[MEMORY_SIZE];
 
 // Pointer to the start of the memory pool
-static void* start = memory_pool;
+static void* next_available_block = memory_pool;
 
-// Next available block index
-static size_t next_available_block = 0;
+static const void* start = memory_pool;
+static const void* end = memory_pool + NUM_BLOCKS * sizeof(int);
+
 
 // Pointer to the head of the free list
 static void* free_list_head = NULL;
@@ -60,9 +62,9 @@ void* custom_alloc() {
         void* allocated = free_list_head;
         free_list_head = restorePointer((int*)free_list_head);
         return allocated;
-    } else if (next_available_block < NUM_BLOCKS) {
-        void* new_block = &memory_pool[next_available_block * BLOCK_SIZE];
-        next_available_block++;
+    } else if (next_available_block < end) {
+        void* new_block = next_available_block;
+        next_available_block+=sizeof(int);
         return new_block;
     }
     return NULL; // Out of memory
@@ -102,6 +104,9 @@ int main() {
         if (d && e) {
             printf("Reallocated addresses: %p, %p\n", (void*)d, (void*)e);
         }
+        // the free list after the free looks like a->c->b->NULL
+        // thus d will get a addr ; c->b->NULL ; e will get c addr; b->NULL;
+        assert(d == a && e == c);
     } else {
         printf("Allocation failed\n");
     }
