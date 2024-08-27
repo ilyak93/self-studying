@@ -8,9 +8,6 @@
 #define PORT 8080
 
 int main(int argc, char const* argv[]) {
-
-
-
     int client_fd = -1;
     if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("\n Socket creation error \n");
