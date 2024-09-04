@@ -1,50 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const ChatWindow = ({ recipient }) => {
+const ChatWindow = ({ chat, currentUser }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
 
   useEffect(() => {
-    fetchMessages();
-  }, [recipient]);
+    const fetchMessages = async () => {
+      try {
+        const response = await axios.get(`/api/chats/${chat.id}/messages`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        setMessages(response.data);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
 
-  const fetchMessages = async () => {
-    try {
-      const response = await axios.get(`/api/messages/${recipient.id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      setMessages(response.data);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+    if (chat && chat.id) {
+      fetchMessages();
     }
-  };
+  }, [chat]); // Only re-run the effect if `chat` changes
 
   const sendMessage = async (e) => {
     e.preventDefault();
+    if (!newMessage.trim() || !chat || !chat.id) return;
+
     try {
-      await axios.post('/api/messages', 
-        { recipientId: recipient.id, content: newMessage },
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
-      );
+      const response = await axios.post(`/api/chats/${chat.id}/messages`, {
+        content: newMessage,
+        recipientType: chat.type
+      }, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessages([...messages, response.data]);
       setNewMessage('');
-      fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleString();
-  };
-
   return (
     <div>
-      <h2>Chat with {recipient.name}</h2>
-      <div style={{ height: '300px', overflowY: 'scroll' }}>
+      <h2>{chat.type === 'group' ? `Group: ${chat.name}` : `Chat with ${chat.name}`}</h2>
+      <div style={{ height: '300px', overflowY: 'scroll', border: '1px solid #ccc' }}>
         {messages.map(message => (
           <div key={message.id}>
-            <strong>{formatDate(message.timestamp)} {message.sender.name}:</strong> {message.content}
+            <strong>{message.sender.name}: </strong>
+            {message.content}
           </div>
         ))}
       </div>
