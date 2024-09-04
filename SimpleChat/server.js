@@ -17,7 +17,8 @@ const personSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true }
+  password: { type: String, required: true },
+  groups: [{ type: String, ref: 'Group' }]
 });
 
 personSchema.set('toJSON', {
@@ -31,8 +32,7 @@ personSchema.set('toJSON', {
 
 const groupSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  members: [{ type: String, ref: 'Person' }],
+  name: { type: String, required: true }
 });
 
 const messageSchema = new mongoose.Schema({
@@ -43,6 +43,8 @@ const messageSchema = new mongoose.Schema({
   recipientType: { type: String, enum: ['person', 'group'], required: true },
   recipientId: { type: String, required: true }
 });
+
+personSchema.index({ name: 'text', email: 'text' });
 
 const Person = mongoose.model('Person', personSchema);
 const Group = mongoose.model('Group', groupSchema);
@@ -99,7 +101,7 @@ app.post('/login', async (req, res) => {
 
     const payload = {
       person: {
-        id: person.id  // Use the string id, not _id
+        id: person.id
       }
     };
 
@@ -117,6 +119,7 @@ app.post('/login', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 
 // Socket.io
@@ -145,18 +148,47 @@ server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // Helper function to generate unique IDs
 function generateUniqueId(prefix) {
-  return `${prefix}_${new mongoose.Types.ObjectId().toString()}`;
+  return `${prefix}_${new mongoose.Types.ObjectId()}`;
 }
 
 app.get('/api/chats', authMiddleware, async (req, res) => {
+  console.log('Received request for /api/chats');
+  console.log('req.person:', req.person);
+  
   try {
+    if (!req.person || !req.person.id) {
+      console.log('Person not authenticated properly');
+      return res.status(401).json({ message: 'Person not authenticated properly' });
+    }
+
     const personId = req.person.id;
     console.log('Fetching chats for person:', personId);
 
+    // Fetch the person to get their group list
+    const currentPerson = await Person.findOne({ id: personId });
+    if (!currentPerson) {
+      return res.status(404).json({ message: 'Person not found' });
+    }
+
+    // Fetch group chats
+    const groupChats = await Group.find({ id: { $in: currentPerson.groups } })
+      .select('id name')
+      .lean();
+
+    const formattedGroupChats = groupChats.map(group => ({
+      id: group.id,
+      name: group.name,
+      type: 'group'
+    }));
+
+    console.log('Group chats found:', formattedGroupChats.length);
+
+    // Fetch personal chats
     const personalChats = await Message.aggregate([
       {
         $match: {
-          $or: [{ sender: personId }, { recipientId: personId }]
+          $or: [{ sender: personId }, { recipientId: personId }],
+          recipientType: 'person'
         }
       },
       {
@@ -179,45 +211,59 @@ app.get('/api/chats', authMiddleware, async (req, res) => {
           from: 'persons',
           localField: '_id',
           foreignField: 'id',
-          as: 'personInfo'
+          as: 'otherPerson'
         }
       },
       {
-        $unwind: '$personInfo'
+        $unwind: '$otherPerson'
       },
       {
         $project: {
-          _id: 0,
           id: '$_id',
-          name: '$personInfo.name',
+          name: '$otherPerson.name',
           type: 'personal',
-          lastMessage: 1
+          lastMessage: '$lastMessage.content'
         }
       }
     ]);
 
     console.log('Personal chats found:', personalChats.length);
-    res.json(personalChats);
+
+    // Combine and send all chats
+    const allChats = [...formattedGroupChats, ...personalChats];
+    console.log('Total chats found:', allChats.length);
+    res.json(allChats);
   } catch (error) {
     console.error('Error fetching chats:', error);
-    res.status(500).json({ message: 'Error fetching chats', error: error.message });
+    res.status(500).json({ message: 'Error fetching chats' });
   }
 });
+
 
 app.get('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.params;
     const personId = req.person.id;
 
-    // For now, just fetch messages without checking chat participation
-    const messages = await Message.find({ 
-      $or: [
-        { sender: personId, recipientId: chatId },
-        { sender: chatId, recipientId: personId }
-      ]
-    })
-    .sort({ timestamp: 1 })
-    .populate('sender', 'name');
+    // Check if the chat is a group chat
+    const group = await Group.findOne({ id: chatId });
+    
+    let messages;
+    if (group) {
+      // Fetch all messages for this group
+      messages = await Message.find({ 
+        recipientId: chatId, 
+        recipientType: 'group' 
+      }).sort({ timestamp: 1 }).populate('sender', 'name');
+    } else {
+      // Fetch personal chat messages
+      messages = await Message.find({
+        $or: [
+          { sender: personId, recipientId: chatId, recipientType: 'person' },
+          { sender: chatId, recipientId: personId, recipientType: 'person' }
+        ]
+      }).sort({ timestamp: 1 }).populate('sender', 'name');
+    }
 
     res.json(messages);
   } catch (error) {
@@ -230,18 +276,25 @@ app.post('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.params;
     const { content } = req.body;
-    const personId = req.person.id;
+    const senderId = req.person.id;
+
+    // Check if it's a group chat
+    const group = await Group.findOne({ id: chatId });
+    const recipientType = group ? 'group' : 'person';
 
     const newMessage = new Message({
       id: generateUniqueId('M'),
       content,
-      sender: personId,
+      sender: senderId,
       recipientId: chatId,
-      recipientType: 'person', // Assume personal chat for now
+      recipientType,
       timestamp: new Date()
     });
 
     await newMessage.save();
+
+    // If it's a group chat, no need to update any chat document
+    // For personal chats, you might want to update a chat document if you have one
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -266,16 +319,24 @@ app.get('/api/person', authMiddleware, async (req, res) => {
 
 
 app.get('/api/users/search', authMiddleware, async (req, res) => {
+  console.log('Search query received:', req.query);
   try {
     const { email } = req.query;
+
+    console.log('Search query received:', email);
+
     const users = await Person.find({ 
-      email: { $regex: email, $options: 'i' },
+      $or: [
+        { email: { $regex: email, $options: 'i' } }
+      ],
       id: { $ne: req.person.id } // Exclude the current user
     }).select('id name email');
+
+    console.log('Users found:', users.length);
     res.json(users);
   } catch (error) {
     console.error('Error searching users:', error);
-    res.status(500).json({ message: 'Error searching users' });
+    res.status(500).json({ message: 'Error searching users', error: error.message });
   }
 });
 
@@ -318,5 +379,34 @@ app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ message: 'Error fetching messages' });
+  }
+});
+
+
+app.post('/api/groups', authMiddleware, async (req, res) => {
+  try {
+    const { name, members } = req.body;
+    const creatorId = req.person.id;
+
+    const newGroup = new Group({
+      id: generateUniqueId('G'),
+      name
+    });
+
+    await newGroup.save();
+
+    // Include the creator in the members list if not already present
+    const allMembers = [...new Set([creatorId, ...members])];
+
+    // Update the groups field for all members
+    await Person.updateMany(
+      { id: { $in: allMembers } },
+      { $addToSet: { groups: newGroup.id } }
+    );
+
+    res.status(201).json(newGroup);
+  } catch (error) {
+    console.error('Error creating group:', error);
+    res.status(500).json({ message: 'Error creating group' });
   }
 });
