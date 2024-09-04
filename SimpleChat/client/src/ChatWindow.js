@@ -6,21 +6,21 @@ const ChatWindow = ({ chat, currentUser }) => {
   const [newMessage, setNewMessage] = useState('');
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const response = await axios.get(`/api/chats/${chat.id}/messages`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        setMessages(response.data);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-      }
-    };
-
     if (chat && chat.id) {
       fetchMessages();
     }
-  }, [chat]); // Only re-run the effect if `chat` changes
+  }, [chat]);
+
+  const fetchMessages = async () => {
+    try {
+      const response = await axios.get(`/api/chats/${chat.id}/messages`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessages(response.data);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -40,23 +40,30 @@ const ChatWindow = ({ chat, currentUser }) => {
     }
   };
 
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
   return (
     <div>
-      <h2>{chat.type === 'group' ? `Group: ${chat.name}` : `Chat with ${chat.name}`}</h2>
-      <div style={{ height: '300px', overflowY: 'scroll', border: '1px solid #ccc' }}>
+      <h2>Chat with {chat.name}</h2>
+      <div style={{ height: '300px', overflowY: 'scroll', border: '1px solid #ccc', padding: '10px' }}>
         {messages.map(message => (
-          <div key={message.id}>
-            <strong>{message.sender.name}: </strong>
+          <div key={message.id} style={{ marginBottom: '10px' }}>
+            <strong>{message.senderName}</strong> ({formatDate(message.timestamp)}):
+            <br />
             {message.content}
           </div>
         ))}
       </div>
-      <form onSubmit={sendMessage}>
+      <form onSubmit={sendMessage} style={{ marginTop: '10px' }}>
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message..."
+          style={{ width: '80%', marginRight: '10px' }}
         />
         <button type="submit">Send</button>
       </form>
