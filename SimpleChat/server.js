@@ -30,8 +30,7 @@ personSchema.set('toJSON', {
 
 const groupSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  members: [{ type: String, ref: 'Person' }]
+  name: { type: String, required: true }
 });
 
 groupSchema.set('toJSON', {
@@ -434,15 +433,17 @@ app.post('/api/groups', authMiddleware, async (req, res) => {
 
     const newGroup = new Group({
       id: generateUniqueId('G'),
-      name,
-      members: [creatorId, ...members]
+      name
     });
 
     await newGroup.save();
 
+    // Include the creator in the members list if not already present
+    const allMembers = [...new Set([creatorId, ...members])];
+
     // Update the groups field for all members
     await Person.updateMany(
-      { id: { $in: newGroup.members } },
+      { id: { $in: allMembers } },
       { $addToSet: { groups: newGroup.id } }
     );
 
