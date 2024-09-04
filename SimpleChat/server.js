@@ -23,25 +23,40 @@ const personSchema = new mongoose.Schema({
 
 personSchema.set('toJSON', {
   transform: (document, returnedObject) => {
-    returnedObject.id = returnedObject.id || returnedObject._id.toString();
-    delete returnedObject._id;
     delete returnedObject.__v;
-    delete returnedObject.password; // Don't send password to client
+    delete returnedObject.password;
   }
 });
 
 const groupSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
-  name: { type: String, required: true }
+  name: { type: String, required: true },
+  members: [{ type: String, ref: 'Person' }]
+});
+
+groupSchema.set('toJSON', {
+  transform: (document, returnedObject) => {
+    returnedObject.id = returnedObject.id || returnedObject._id.toString();
+    delete returnedObject._id;
+    delete returnedObject.__v;
+  }
 });
 
 const messageSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   content: { type: String, required: true },
-  sender: { type: String, ref: 'Person', required: true },
+  sender: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
   recipientType: { type: String, enum: ['person', 'group'], required: true },
   recipientId: { type: String, required: true }
+});
+
+messageSchema.set('toJSON', {
+  transform: (document, returnedObject) => {
+    returnedObject.id = returnedObject.id || returnedObject._id.toString();
+    delete returnedObject._id;
+    delete returnedObject.__v;
+  }
 });
 
 personSchema.index({ name: 'text', email: 'text' });
@@ -80,7 +95,7 @@ app.post('/register', async (req, res) => {
 
     res.status(201).json({ message: 'User registered successfully', userId: newPerson.id });
   } catch (error) {
-    console.error(error);
+    console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -148,7 +163,7 @@ server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // Helper function to generate unique IDs
 function generateUniqueId(prefix) {
-  return `${prefix}_${new mongoose.Types.ObjectId()}`;
+  return `${prefix}_${new mongoose.Types.ObjectId().toString()}`;
 }
 
 app.get('/api/chats', authMiddleware, async (req, res) => {
@@ -245,63 +260,49 @@ app.get('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
     const { chatId } = req.params;
     const personId = req.person.id;
 
-    // Check if the chat is a group chat
+    // Check if it's a group chat
     const group = await Group.findOne({ id: chatId });
     
     let messages;
     if (group) {
-      // Fetch all messages for this group
       messages = await Message.find({ 
         recipientId: chatId, 
         recipientType: 'group' 
-      }).sort({ timestamp: 1 }).populate('sender', 'name');
+      }).sort({ timestamp: 1 });
     } else {
-      // Fetch personal chat messages
       messages = await Message.find({
         $or: [
           { sender: personId, recipientId: chatId, recipientType: 'person' },
           { sender: chatId, recipientId: personId, recipientType: 'person' }
         ]
-      }).sort({ timestamp: 1 }).populate('sender', 'name');
+      }).sort({ timestamp: 1 });
     }
 
-    res.json(messages);
+    // Fetch sender names
+    const senderIds = [...new Set(messages.map(m => m.sender))];
+    const senders = await Person.find({ id: { $in: senderIds } }).select('id name');
+    const senderMap = senders.reduce((map, sender) => {
+      map[sender.id] = sender.name;
+      return map;
+    }, {});
+
+    const messagesWithDetails = messages.map(message => ({
+      id: message.id,
+      content: message.content,
+      sender: message.sender,
+      senderName: senderMap[message.sender],
+      timestamp: message.timestamp,
+      recipientType: message.recipientType,
+      recipientId: message.recipientId
+    }));
+
+    res.json(messagesWithDetails);
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ message: 'Error fetching messages' });
   }
 });
 
-app.post('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
-  try {
-    const { chatId } = req.params;
-    const { content } = req.body;
-    const senderId = req.person.id;
-
-    // Check if it's a group chat
-    const group = await Group.findOne({ id: chatId });
-    const recipientType = group ? 'group' : 'person';
-
-    const newMessage = new Message({
-      id: generateUniqueId('M'),
-      content,
-      sender: senderId,
-      recipientId: chatId,
-      recipientType,
-      timestamp: new Date()
-    });
-
-    await newMessage.save();
-
-    // If it's a group chat, no need to update any chat document
-    // For personal chats, you might want to update a chat document if you have one
-
-    res.status(201).json(newMessage);
-  } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ message: 'Error sending message' });
-  }
-});
 
 
 app.get('/api/person', authMiddleware, async (req, res) => {
@@ -340,42 +341,85 @@ app.get('/api/users/search', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/messages', authMiddleware, async (req, res) => {
+app.post('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
   try {
-    const { recipientId, content } = req.body;
-    const senderId = req.person.id;
+    const { chatId } = req.params;
+    const { content } = req.body;
+    const personId = req.person.id;
+
+    // Check if it's a group chat
+    const group = await Group.findOne({ id: chatId });
+    const recipientType = group ? 'group' : 'person';
 
     const newMessage = new Message({
       id: generateUniqueId('M'),
       content,
-      sender: senderId,
-      recipientId,
-      recipientType: 'person',
+      sender: personId,
+      recipientId: chatId,
+      recipientType,
       timestamp: new Date()
     });
 
     await newMessage.save();
 
-    res.status(201).json(newMessage);
+    // Fetch sender's name
+    const sender = await Person.findOne({ id: personId }).select('name');
+
+    const messageWithSenderName = {
+      ...newMessage.toJSON(),
+      senderName: sender.name
+    };
+
+    res.status(201).json(messageWithSenderName);
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ message: 'Error sending message' });
   }
 });
 
-app.get('/api/messages/:recipientId', authMiddleware, async (req, res) => {
+
+app.get('/api/chats/:chatId/messages', authMiddleware, async (req, res) => {
   try {
-    const { recipientId } = req.params;
-    const senderId = req.person.id;
+    const { chatId } = req.params;
+    const personId = req.person.id;
 
-    const messages = await Message.find({
-      $or: [
-        { sender: senderId, recipientId: recipientId },
-        { sender: recipientId, recipientId: senderId }
-      ]
-    }).sort({ timestamp: 1 });
+    // Check if it's a group chat
+    const group = await Group.findOne({ id: chatId });
+    
+    let messages;
+    if (group) {
+      messages = await Message.find({ 
+        recipientId: chatId, 
+        recipientType: 'group' 
+      }).sort({ timestamp: 1 });
+    } else {
+      messages = await Message.find({
+        $or: [
+          { sender: personId, recipientId: chatId, recipientType: 'person' },
+          { sender: chatId, recipientId: personId, recipientType: 'person' }
+        ]
+      }).sort({ timestamp: 1 });
+    }
 
-    res.json(messages);
+    // Fetch sender names
+    const senderIds = [...new Set(messages.map(m => m.sender))];
+    const senders = await Person.find({ id: { $in: senderIds } }).select('id name');
+    const senderMap = senders.reduce((map, sender) => {
+      map[sender.id] = sender.name;
+      return map;
+    }, {});
+
+    const messagesWithDetails = messages.map(message => ({
+      id: message.id,
+      content: message.content,
+      sender: message.sender,
+      senderName: senderMap[message.sender],
+      timestamp: message.timestamp,
+      recipientType: message.recipientType,
+      recipientId: message.recipientId
+    }));
+
+    res.json(messagesWithDetails);
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ message: 'Error fetching messages' });
@@ -390,17 +434,15 @@ app.post('/api/groups', authMiddleware, async (req, res) => {
 
     const newGroup = new Group({
       id: generateUniqueId('G'),
-      name
+      name,
+      members: [creatorId, ...members]
     });
 
     await newGroup.save();
 
-    // Include the creator in the members list if not already present
-    const allMembers = [...new Set([creatorId, ...members])];
-
     // Update the groups field for all members
     await Person.updateMany(
-      { id: { $in: allMembers } },
+      { id: { $in: newGroup.members } },
       { $addToSet: { groups: newGroup.id } }
     );
 
