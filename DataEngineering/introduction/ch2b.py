@@ -163,3 +163,20 @@ print(film_df_with_ratings.show(5))
 +-------+----------------+--------------------+------------+-----------+--------------------+---------------+-----------+------+----------------+------+--------------------+--------------------+--------------------+-------+------------------+
 only showing top 5 rows
 '''
+
+#another part
+# Import necessary libraries
+import pandas as pd
+from pyspark.sql import SparkSession
+
+# Assume film_pdf (pandas DataFrame) and film_sdf (PySpark DataFrame) already exist
+# If not, you would need to create or load them, for example:
+# film_pdf = pd.read_csv('films.csv')
+# spark = SparkSession.builder.appName("ParquetExample").getOrCreate()
+# film_sdf = spark.read.csv('films.csv', header=True, inferSchema=True)
+
+# Write the pandas DataFrame to parquet
+film_pdf.to_parquet("films_pdf.parquet")
+
+# Write the PySpark DataFrame to parquet
+film_sdf.write.parquet("films_sdf.parquet")
