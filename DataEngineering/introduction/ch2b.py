@@ -60,6 +60,8 @@ DataFrame[Year: int, avg(Age): double]
 only showing top 20 rows
 '''
 
+#airflow
+
 # Import necessary modules
 from airflow import DAG
 from airflow.utils.dates import days_ago
@@ -73,3 +75,51 @@ dag = DAG(
     },
     schedule_interval="0 * * * *"
 )
+
+#fetch from external api
+import requests
+
+# Fetch the Hackernews post
+resp = requests.get("https://hacker-news.firebaseio.com/v0/item/16222426.json")
+
+# Print the response parsed as JSON
+print(resp.json())
+
+# Assign the score of the test to post_score
+post_score = resp.json()["score"]
+print(post_score)
+
+#{'by': 'neis', 'descendants': 0, 'id': 16222426, 'score': 17, 'time': 1516800333, 'title': 'Duolingo-Style Learning for Data Science: DataCamp for Mobile', 'type': 'story', 'url': 'https://medium.com/datacamp/duolingo-style-learning-for-data-science-datacamp-for-mobile-3861d1bc02df'}
+#17
+
+# Function to extract table to a pandas DataFrame
+def extract_table_to_pandas(tablename, db_engine):
+    query = "SELECT * FROM {tablename}".format(tablename=tablename)
+    return pd.read_sql(query, db_engine)
+
+# Connect to the database using the connection URI
+connection_uri = "postgresql://repl:password@localhost:5432/pagila" 
+db_engine = sqlalchemy.create_engine(connection_uri)
+
+# Extract the film table into a pandas DataFrame
+extract_table_to_pandas("film", db_engine)
+
+# Extract the customer table into a pandas DataFrame
+extract_table_to_pandas("customer", db_engine)
+'''
+
+     customer_id  store_id first_name  last_name                                  email  address_id  activebool create_date               last_update  active
+0              1         1       MARY      SMITH          MARY.SMITH@sakilacustomer.org           5        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+1              2         1   PATRICIA    JOHNSON    PATRICIA.JOHNSON@sakilacustomer.org           6        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+2              3         1      LINDA   WILLIAMS      LINDA.WILLIAMS@sakilacustomer.org           7        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+3              4         2    BARBARA      JONES       BARBARA.JONES@sakilacustomer.org           8        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+4              5         1  ELIZABETH      BROWN     ELIZABETH.BROWN@sakilacustomer.org           9        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+..           ...       ...        ...        ...                                    ...         ...         ...         ...                       ...     ...
+594          595         1   TERRENCE  GUNDERSON  TERRENCE.GUNDERSON@sakilacustomer.org         601        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+595          596         1    ENRIQUE   FORSYTHE    ENRIQUE.FORSYTHE@sakilacustomer.org         602        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+596          597         1    FREDDIE     DUGGAN      FREDDIE.DUGGAN@sakilacustomer.org         603        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+597          598         1       WADE   DELVALLE       WADE.DELVALLE@sakilacustomer.org         604        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+598          599         2     AUSTIN    CINTRON      AUSTIN.CINTRON@sakilacustomer.org         605        True  2017-02-14 2017-02-15 09:57:20+00:00       1
+
+[599 rows x 10 columns]
+'''
