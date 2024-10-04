@@ -32,3 +32,33 @@ User 2 and User 3 overlap: set()
 '''
 
 #part 2
+# Complete the transformation function
+def transform_avg_rating(rating_data):
+    # Group by course_id and extract average rating per course
+    avg_rating = rating_data.groupby('course_id').rating.mean()
+    # Return sorted average ratings per course
+    sort_rating = avg_rating.sort_values(ascending=False).reset_index()
+    return sort_rating
+
+# Extract the rating data into a DataFrame    
+rating_data = extract_rating_data(db_engines)
+
+# Use transform_avg_rating on the extracted data and print results
+avg_rating_data = transform_avg_rating(rating_data)
+'''
+print(avg_rating_data) 
+    course_id    rating
+0          46  4.800000
+1          23  4.800000
+2          96  4.692765
+3          56  4.661765
+4          24  4.653061
+..        ...       ...
+94         54  4.238095
+95         92  4.222222
+96         29  4.208333
+97         17  4.147059
+98         42  4.107570
+
+[99 rows x 2 columns]
+'''
